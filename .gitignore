@@ -1,0 +1,8 @@
+node_modules/
+dist/
+data.json
+*.log
+.DS_Store
+meta ai video downloader/
+ss/
+6b3728cc-cfff-44d3-ba6b-c2e2ee9d4a15.png

@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Script Manager — Organize Your Video Scripts</title>
+  <meta name="description" content="A premium dark-mode app to store, format, and schedule your video scripts with rich text editing and calendar timeline.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="logo.png">
+</head>
+<body>
+  <div id="app">
+
+    <!-- ═══════════════ Nav Rail ═══════════════ -->
+    <nav id="navRail" class="nav-rail">
+      <div class="rail-top">
+        <img src="logo.png" alt="Logo" class="rail-logo" title="Script Manager">
+        <button id="editorTab" class="rail-tab active" data-view="editor" title="Scripts">
+          <span class="rail-icon">📝</span>
+        </button>
+        <button id="calendarTab" class="rail-tab" data-view="calendar" title="Calendar">
+          <span class="rail-icon">📅</span>
+        </button>
+      </div>
+      <div class="rail-bottom">
+      </div>
+    </nav>
+
+    <!-- ═══════════════ List Pane ═══════════════ -->
+    <aside id="listPane" class="list-pane">
+      <div class="list-pane-header">
+        <h2>Scripts</h2>
+        <div class="header-actions">
+          <button id="newScriptBtn" class="btn-icon btn-new-script" title="New Script">
+            +
+          </button>
+        </div>
+      </div>
+
+      <div class="list-search">
+        <div class="search-wrapper">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="searchInput" placeholder="Search..." autocomplete="off">
+        </div>
+        <select id="statusFilter" class="list-filter">
+          <option value="all">All</option>
+          <option value="pending">Pending</option>
+          <option value="finished">Finished</option>
+          <option value="rejected">Rejected</option>
+        </select>
+      </div>
+
+      <div id="scriptList" class="script-list"></div>
+
+      <div class="list-pane-footer">
+        <span id="scriptCount">0 scripts</span>
+      </div>
+    </aside>
+
+    <!-- ═══════════════ Editor Pane ═══════════════ -->
+    <main id="editorPane" class="editor-pane">
+      <!-- Floating Header (Action Bar) -->
+      <header class="editor-header">
+        <div class="editor-header-left">
+          <!-- empty for now or breadcrumbs -->
+        </div>
+        <div class="editor-header-right">
+          <button id="openTeleprompterRailBtn" class="btn-icon" title="Teleprompter" style="display:none; font-size: 16px;">
+            📺
+          </button>
+          <button id="printScriptBtn" class="btn-icon" title="Print Script (Ctrl+P)" style="display:none">
+            🖨️
+          </button>
+          <button id="deleteScriptBtn" class="btn-icon btn-danger" title="Delete Script" style="display:none">
+            🗑️
+          </button>
+        </div>
+      </header>
+
+      <!-- ──── Editor View ──── -->
+      <div id="editorView" class="view active">
+        <!-- Main Editor Column -->
+        <div class="editor-main-column">
+          <!-- Cover Image -->
+          <div id="coverImageArea" class="cover-image-area">
+            <div id="coverImagePreview" class="cover-preview">
+              <div class="cover-placeholder">
+                <span class="cover-placeholder-icon">📷</span>
+                <span>Click to add cover image</span>
+              </div>
+            </div>
+            <input type="file" id="coverImageInput" accept="image/*" hidden>
+            <button id="removeCoverBtn" class="btn-remove-cover" style="display:none">✕</button>
+          </div>
+
+          <!-- Title -->
+          <input type="text" id="scriptTitle" class="script-title-input" placeholder="Untitled Script" spellcheck="false">
+
+          <!-- Meta Bar (Date & Status) -->
+          <div class="publish-date-bar">
+            <button id="publishDateBtn" class="btn-date">
+              📅 <span id="publishDateText">Set publish date</span>
+            </button>
+            
+            <select id="scriptStatus" class="status-select">
+              <option value="pending">⏳ Pending</option>
+              <option value="finished">✅ Finished</option>
+              <option value="rejected">❌ Rejected</option>
+            </select>
+          </div>
+
+          <!-- Toolbar -->
+          <div id="toolbar" class="editor-toolbar">
+            <div class="toolbar-group">
+              <button class="toolbar-btn" data-command="bold" title="Bold (Ctrl+B)"><b>B</b></button>
+              <button class="toolbar-btn" data-command="italic" title="Italic (Ctrl+I)"><i>I</i></button>
+              <button class="toolbar-btn" data-command="underline" title="Underline (Ctrl+U)"><u>U</u></button>
+              <button class="toolbar-btn" data-command="strikeThrough" title="Strikethrough"><s>S</s></button>
+            </div>
+            <div class="toolbar-divider"></div>
+            <!-- Teleprompter moved to nav rail, removed from toolbar -->
+            <div class="toolbar-divider"></div>
+            <div class="toolbar-group">
+              <button class="toolbar-btn toolbar-btn-wide" data-command="formatBlock" data-value="h1" title="Heading 1">H1</button>
+              <button class="toolbar-btn toolbar-btn-wide" data-command="formatBlock" data-value="h2" title="Heading 2">H2</button>
+              <button class="toolbar-btn toolbar-btn-wide" data-command="formatBlock" data-value="h3" title="Heading 3">H3</button>
+            </div>
+            <div class="toolbar-divider"></div>
+            <div class="toolbar-group">
+              <button class="toolbar-btn toolbar-btn-wide" data-command="insertUnorderedList" title="Bullet List">• List</button>
+              <button class="toolbar-btn toolbar-btn-wide" data-command="insertOrderedList" title="Numbered List">1. List</button>
+            </div>
+            <div class="toolbar-divider"></div>
+            <div class="toolbar-group">
+              <button class="toolbar-btn" data-command="formatBlock" data-value="blockquote" title="Blockquote">❞</button>
+              <button class="toolbar-btn" id="linkBtn" title="Insert Link">🔗</button>
+              <button class="toolbar-btn" id="colorBtn" title="Text Color">🎨</button>
+              <input type="color" id="colorPicker" value="#a599ff" hidden>
+            </div>
+            <div class="toolbar-divider"></div>
+            <div class="toolbar-group" style="align-items: center; padding: 0 8px;">
+              <span style="font-size: 12px; color: var(--text-muted); margin-right: 8px;">Aa</span>
+              <input type="range" id="fontSizeSlider" min="12" max="32" value="15" step="1" title="Adjust Editor Font Size" class="font-size-slider">
+            </div>
+          </div>
+
+          <!-- Content Editor -->
+          <div id="editor" class="editor-content" contenteditable="true" data-placeholder="Start writing your script..." spellcheck="true"></div>
+
+          <!-- Custom Context Menu -->
+          <div id="editorContextMenu" class="editor-context-menu" hidden>
+            <button class="ctx-menu-item" data-action="bold"><b>B</b>&nbsp;&nbsp;Bold</button>
+            <button class="ctx-menu-item" data-action="italic"><i>I</i>&nbsp;&nbsp;Italic</button>
+            <button class="ctx-menu-item" data-action="highlight">🖍️&nbsp;&nbsp;Highlight</button>
+            <button class="ctx-menu-item" data-action="remove-highlight">🧹&nbsp;&nbsp;Clear Highlight</button>
+            <div class="ctx-menu-divider"></div>
+            <button class="ctx-menu-item" data-action="make-part">📑&nbsp;&nbsp;Make Part</button>
+          </div>
+
+          <!-- Find & Replace Panel -->
+          <div id="findReplacePanel" class="find-replace-panel" hidden>
+            <div class="find-replace-header">
+              <span id="findReplaceTitle">Find & Replace</span>
+              <button id="closeFindReplaceBtn" class="btn-icon">✕</button>
+            </div>
+            <div class="find-replace-body">
+              <div class="input-group">
+                <input type="text" id="findInput" placeholder="Find..." />
+                <span id="findMatchCount" class="match-count">0/0</span>
+              </div>
+              <div class="input-group" id="replaceGroup">
+                <input type="text" id="replaceInput" placeholder="Replace with..." />
+              </div>
+              <div class="find-replace-actions">
+                <button id="findPrevBtn" class="btn-secondary" title="Previous match">↑</button>
+                <button id="findNextBtn" class="btn-secondary" title="Next match">↓</button>
+                <button id="replaceBtn" class="btn-secondary" title="Replace current match">Replace</button>
+                <button id="replaceAllBtn" class="btn-secondary" title="Replace all matches">Replace All</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Parts Sidebar -->
+        <div id="partsSidebar" class="parts-sidebar">
+          <div class="parts-sidebar-header">
+            <h3>📑 Script Parts</h3>
+          </div>
+          <div class="parts-sidebar-body">
+            <p class="parts-hint">Select text in editor → Right click → <b>Make Part</b></p>
+            <div id="partsList" class="parts-list">
+              <!-- Part items will be injected here -->
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ──── Calendar View ──── -->
+      <div id="calendarView" class="view">
+        <div class="calendar-container">
+          <div class="calendar-header">
+            <button id="prevMonth" class="btn-icon">◀</button>
+            <h2 id="calendarTitle">June 2026</h2>
+            <button id="nextMonth" class="btn-icon">▶</button>
+            <button id="todayBtn" class="btn-today">Today</button>
+          </div>
+          <div class="calendar-grid">
+            <div class="calendar-weekdays">
+              <span>Sun</span>
+              <span>Mon</span>
+              <span>Tue</span>
+              <span>Wed</span>
+              <span>Thu</span>
+              <span>Fri</span>
+              <span>Sat</span>
+            </div>
+            <div id="calendarDays" class="calendar-days"></div>
+          </div>
+
+          <!-- Upcoming Schedule -->
+          <div class="upcoming-section">
+            <div class="upcoming-title">📋 Upcoming Schedule</div>
+            <div id="upcomingList" class="upcoming-list"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ──── Empty State ──── -->
+      <div id="emptyState" class="empty-state">
+        <div class="empty-icon">📝</div>
+        <h2>No Scripts Yet</h2>
+        <p>Create your first script to get started organizing your video projects</p>
+        <button id="emptyNewBtn" class="btn-primary">+ Create New Script</button>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- ═══════════════ Teleprompter Overlay ═══════════════ -->
+  <div id="teleprompterOverlay" class="teleprompter-overlay" hidden>
+    <div class="tp-controls">
+      <button id="tpBackBtn" class="btn-secondary">⬅ Back to Editor</button>
+      
+      <div class="tp-control-group" id="tpPartGroup" style="display:none; align-items:center;">
+        <label for="tpPartSelect" style="margin-right: 8px;">Part</label>
+        <select id="tpPartSelect" class="status-select" style="min-width: 90px;"></select>
+      </div>
+
+      <div class="tp-control-group">
+        <label for="tpSpeedSlider">Speed</label>
+        <input type="range" id="tpSpeedSlider" min="0.2" max="1" step="0.05" value="0.5">
+      </div>
+      
+      <div class="tp-control-group">
+        <label for="tpMarginSlider" title="Side margins">Margin</label>
+        <input type="range" id="tpMarginSlider" min="0" max="40" step="1" value="15">
+      </div>
+
+      <div class="tp-control-group">
+        <label for="tpLineHeightSlider" title="Vertical line spacing">V-Gap</label>
+        <input type="range" id="tpLineHeightSlider" min="1" max="4" step="0.1" value="1.6">
+      </div>
+
+      <div class="tp-control-group">
+        <label for="tpLetterSpacingSlider" title="Horizontal letter spacing">H-Gap</label>
+        <input type="range" id="tpLetterSpacingSlider" min="0" max="10" step="0.5" value="0">
+      </div>
+
+      <div class="tp-control-group">
+        <label for="tpFontSizeSlider">Size</label>
+        <input type="range" id="tpFontSizeSlider" min="24" max="96" step="2" value="48">
+      </div>
+      
+      <button id="tpMirrorBtn" class="btn-secondary" title="Mirror text horizontally">🪞 Mirror</button>
+      <button id="tpFlipBtn" class="btn-secondary" title="Flip text vertically">🔄 Flip</button>
+      <button id="tpPlayPauseBtn" class="btn-primary">▶ Play (Space)</button>
+    </div>
+    
+    <div id="tpScrollArea" class="tp-scroll-area">
+      <div id="tpContent" class="tp-content"></div>
+      <div class="tp-padding-bottom"></div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ Date Picker Modal ═══════════════ -->
+  <div id="dateModal" class="modal-overlay" hidden>
+    <div class="modal">
+      <div class="modal-header">
+        <h3>📅 Set Publish Date</h3>
+        <button class="modal-close" data-modal="dateModal">✕</button>
+      </div>
+      <div class="modal-body">
+        <input type="date" id="publishDateInput" class="date-input">
+      </div>
+      <div class="modal-footer">
+        <button id="removeDateBtn" class="btn-secondary">Remove Date</button>
+        <button id="saveDateBtn" class="btn-primary">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ Delete Confirmation Modal ═══════════════ -->
+  <div id="deleteModal" class="modal-overlay" hidden>
+    <div class="modal">
+      <div class="modal-header">
+        <h3>🗑️ Delete Script</h3>
+        <button class="modal-close" data-modal="deleteModal">✕</button>
+      </div>
+      <div class="modal-body">
+        <p>Are you sure you want to delete this script? This action cannot be undone.</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary modal-close" data-modal="deleteModal">Cancel</button>
+        <button id="confirmDeleteBtn" class="btn-danger-solid">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ Link Modal ═══════════════ -->
+  <div id="linkModal" class="modal-overlay" hidden>
+    <div class="modal">
+      <div class="modal-header">
+        <h3>🔗 Insert Link</h3>
+        <button class="modal-close" data-modal="linkModal">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="link-input-group">
+          <label for="linkUrlInput">URL</label>
+          <input type="url" id="linkUrlInput" placeholder="https://example.com">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary modal-close" data-modal="linkModal">Cancel</button>
+        <button id="saveLinkBtn" class="btn-primary">Insert Link</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ Print Preview Modal ═══════════════ -->
+  <div id="printPreviewModal" class="print-preview-overlay" hidden>
+    <div class="print-preview-header">
+      <div class="pp-header-left">
+        <button class="btn-icon pp-close-btn" title="Close Preview">✕</button>
+        <h3 style="margin-left: 12px; font-weight: 500;">Print Preview</h3>
+      </div>
+      <div class="pp-header-right">
+        <button id="ppConfirmPrintBtn" class="btn-primary">
+          🖨️ Print Document
+        </button>
+      </div>
+    </div>
+    
+    <div class="print-preview-body">
+      <!-- The A4 Paper Container -->
+      <div class="pp-paper" id="ppPaper">
+        <div class="pp-content">
+          <h1 id="ppTitle" class="pp-title"></h1>
+          <div id="ppBody" class="pp-body editor-content"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ Toast Notifications ═══════════════ -->
+  <div id="toastContainer" class="toast-container"></div>
+
+  <!-- ── Custom Prompt Modal ── -->
+  <div id="customPromptOverlay" class="prompt-overlay mui-dialog-backdrop" hidden>
+    <div class="prompt-dialog mui-dialog">
+      <h3 id="customPromptTitle" class="mui-typography-h6">Enter value</h3>
+      <div class="mui-textfield">
+        <input type="text" id="customPromptInput" class="mui-input" autocomplete="off" />
+      </div>
+      <div class="prompt-actions mui-dialog-actions">
+        <button id="customPromptCancel" class="btn-secondary mui-btn mui-btn-text">Cancel</button>
+        <button id="customPromptOk" class="btn-primary mui-btn mui-btn-contained">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
