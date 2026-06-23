@@ -1629,6 +1629,51 @@
           break;
       }
     });
+
+    let activePartItemContextMenu = null;
+
+    $('#partContextMenu')?.addEventListener('click', (e) => {
+      if (!activePartItemContextMenu) return;
+      const action = e.target.closest('.ctx-menu-item')?.dataset.action;
+      if (!action) return;
+      
+      const partId = activePartItemContextMenu.dataset.partId;
+      const partEl = document.getElementById(partId);
+      
+      if (!partEl) {
+        $('#partContextMenu').hidden = true;
+        return;
+      }
+
+      if (action === 'delete-part') {
+        const fragment = document.createDocumentFragment();
+        while (partEl.firstChild) fragment.appendChild(partEl.firstChild);
+        partEl.parentNode.replaceChild(fragment, partEl);
+        updatePartsSidebar();
+        saveCurrentEditorContent();
+      } else if (action === 'change-color') {
+        let colorIndex = parseInt(partEl.dataset.partColor);
+        colorIndex = (colorIndex % 5) + 1; // cycle 1-5
+        partEl.dataset.partColor = String(colorIndex);
+        updatePartsSidebar();
+        saveCurrentEditorContent();
+      } else if (action === 'print-part') {
+        let content = partEl.innerHTML || '';
+        content = content.replace(/color:\s*(?:#ffffff|#fff|rgba?\(\s*255\s*,\s*255\s*,\s*255\s*(?:,\s*1\s*)?\))/gi, 'color: #000000');
+        $('#ppTitle').textContent = partEl.dataset.partName || 'Part';
+        $('#ppBody').innerHTML = content;
+        $('#printPreviewModal').hidden = false;
+      }
+      
+      $('#partContextMenu').hidden = true;
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('#partContextMenu')) {
+        const pcm = $('#partContextMenu');
+        if (pcm) pcm.hidden = true;
+      }
+    });
   }
 
   // ── Parts Sidebar Logic ────────────────────────────────────
@@ -1691,6 +1736,17 @@
           script.partsOrder = newOrder;
           save();
           updatePartsSidebar(); // refresh to enforce the correct order array
+        }
+      });
+      
+      item.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        activePartItemContextMenu = item;
+        const ctxMenu = $('#partContextMenu');
+        if (ctxMenu) {
+          ctxMenu.style.left = `${e.clientX}px`;
+          ctxMenu.style.top = `${e.clientY}px`;
+          ctxMenu.hidden = false;
         }
       });
       
