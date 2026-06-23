@@ -1630,14 +1630,14 @@
       }
     });
 
-    let activePartItemContextMenu = null;
+    window.activePartItemContextMenu = null;
 
     $('#partContextMenu')?.addEventListener('click', (e) => {
-      if (!activePartItemContextMenu) return;
+      if (!window.activePartItemContextMenu) return;
       const action = e.target.closest('.ctx-menu-item')?.dataset.action;
       if (!action) return;
       
-      const partId = activePartItemContextMenu.dataset.partId;
+      const partId = window.activePartItemContextMenu.dataset.partId;
       const partEl = document.getElementById(partId);
       
       if (!partEl) {
@@ -1741,7 +1741,7 @@
       
       item.addEventListener('contextmenu', (e) => {
         e.preventDefault();
-        activePartItemContextMenu = item;
+        window.activePartItemContextMenu = item;
         const ctxMenu = $('#partContextMenu');
         if (ctxMenu) {
           ctxMenu.style.left = `${e.clientX}px`;
