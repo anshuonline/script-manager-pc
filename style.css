@@ -1717,7 +1717,7 @@ body {
 /* Force all text inside print paper to black, except inline styles */
 .pp-paper .editor-content,
 .pp-paper .editor-content * {
-  color: #000000;
+  color: #000000 !important;
 }
 
 /* Remove blockquote dark mode background for print */
