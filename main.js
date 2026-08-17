@@ -3,6 +3,7 @@ const path = require('path');
 const os = require('os');
 const fs = require('fs');
 const { startSyncServer, stopSyncServer, getLocalIP } = require('./sync-server');
+const { getAuthUrl, handleCallback, syncScripts, MOCK_MODE } = require('./drive-sync');
 
 // Keep a global reference to prevent garbage collection
 let mainWindow;
@@ -23,7 +24,7 @@ function createWindow() {
     // Frameless with custom titlebar feel — but keep native controls
     titleBarStyle: 'default',
     autoHideMenuBar: true,
-    icon: path.join(__dirname, 'icon.ico'),
+    icon: path.join(__dirname, 'icon1.ico'),
   });
 
   // Force external links to open in the user's default browser (e.g., Chrome)
@@ -49,12 +50,41 @@ function createWindow() {
     const serverInfo = startSyncServer(mainWindow);
     const ip = getLocalIP();
     console.log(`[Script Manager] Sync server started at http://${ip}:3456`);
+    mainWindow.webContents.send('server-ip', ip);
   });
 
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
 }
+
+// ── Google Drive Sync Handlers ──
+ipcMain.handle('drive-connect', async (event) => {
+  const url = getAuthUrl();
+  if (MOCK_MODE) {
+    // Simulate auth success
+    const result = await handleCallback('mock_code');
+    return { success: true, email: result.email };
+  } else {
+    shell.openExternal(url);
+    // In real mode, sync-server would handle the callback and send a message back to mainWindow
+    return { success: true, pending: true };
+  }
+});
+
+ipcMain.handle('drive-sync', async (event, scripts) => {
+  try {
+    await syncScripts(scripts, (current, total) => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('drive-sync-progress', { current, total });
+      }
+    });
+    return { success: true };
+  } catch (err) {
+    console.error(err);
+    return { success: false, error: err.message };
+  }
+});
 
 // IPC handler for printing to PDF to get native preview
 ipcMain.on('print-to-pdf', async (event, title) => {
@@ -94,6 +124,9 @@ ipcMain.on('print-to-pdf', async (event, title) => {
 });
 
 // App lifecycle
+// Explicitly set the App User Model ID so Windows Taskbar pins remain across updates
+app.setAppUserModelId("com.scriptmanager.app");
+
 app.whenReady().then(createWindow);
 
 app.on('window-all-closed', () => {

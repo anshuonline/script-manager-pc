@@ -17,12 +17,18 @@
     <!-- ═══════════════ Nav Rail ═══════════════ -->
     <nav id="navRail" class="nav-rail">
       <div class="rail-top">
-        <img src="logo.png" alt="Logo" class="rail-logo" title="Script Manager">
+        <img src="icon1.ico" alt="Logo" class="rail-logo" title="Script Manager">
         <button id="editorTab" class="rail-tab active" data-view="editor" title="Scripts">
-          <span class="rail-icon">📝</span>
+          <span class="rail-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><line x1="10" y1="9" x2="8" y2="9"></line></svg></span>
         </button>
         <button id="calendarTab" class="rail-tab" data-view="calendar" title="Calendar">
-          <span class="rail-icon">📅</span>
+          <span class="rail-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg></span>
+        </button>
+        <button id="statsTab" class="rail-tab" data-view="stats" title="Statistics">
+          <span class="rail-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg></span>
+        </button>
+        <button id="driveTab" class="rail-tab" data-view="drive" title="Google Drive Backup">
+          <span class="rail-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19a5.5 5.5 0 0 0 0-11 5.5 5.5 0 0 0-11 0A5.5 5.5 0 0 0 6.5 19h11z"></path></svg></span>
         </button>
       </div>
       <div class="rail-bottom">
@@ -50,6 +56,7 @@
           <option value="pending">Pending</option>
           <option value="finished">Finished</option>
           <option value="rejected">Rejected</option>
+          <option value="deleted">Trash</option>
         </select>
       </div>
 
@@ -83,125 +90,161 @@
       <!-- ──── Editor View ──── -->
       <div id="editorView" class="view active">
         <!-- Main Editor Column -->
-        <div class="editor-main-column">
-          <!-- Cover Image -->
-          <div id="coverImageArea" class="cover-image-area">
-            <div id="coverImagePreview" class="cover-preview">
-              <div class="cover-placeholder">
-                <span class="cover-placeholder-icon">📷</span>
-                <span>Click to add cover image</span>
+        <div class="editor-main-column" style="overflow-y: hidden;">
+          <div class="editor-scroll-area" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column;">
+            <!-- Cover Image -->
+            <div id="coverImageArea" class="cover-image-area">
+              <div id="coverImagePreview" class="cover-preview">
+                <div class="cover-placeholder">
+                  <span class="cover-placeholder-icon">📷</span>
+                  <span>Click to add cover image</span>
+                </div>
+              </div>
+              <input type="file" id="coverImageInput" accept="image/*" hidden>
+              <button id="removeCoverBtn" class="btn-remove-cover" style="display:none">✕</button>
+            </div>
+
+            <!-- Title -->
+            <input type="text" id="scriptTitle" class="script-title-input" placeholder="Untitled Script" spellcheck="false">
+
+            <!-- Meta Bar (Date & Status) -->
+            <div class="publish-date-bar">
+              <button id="publishDateBtn" class="btn-date">
+                📅 <span id="publishDateText">Set publish date</span>
+              </button>
+              
+              <select id="scriptStatus" class="status-select">
+                <option value="pending">⏳ Pending</option>
+                <option value="finished">✅ Finished</option>
+                <option value="rejected">❌ Rejected</option>
+                <option value="deleted">🗑️ Trash</option>
+              </select>
+            </div>
+
+            <!-- Toolbar -->
+            <div id="toolbar" class="editor-toolbar">
+              <div class="toolbar-group">
+                <button class="toolbar-btn" data-command="undo" title="Undo (Ctrl+Z)">⟲</button>
+                <button class="toolbar-btn" data-command="redo" title="Redo (Ctrl+Y)">⟳</button>
+              </div>
+              <div class="toolbar-divider"></div>
+              <div class="toolbar-group">
+                <button class="toolbar-btn" data-command="formatBlock" data-value="p" title="Paragraph">P</button>
+                <button class="toolbar-btn" data-command="formatBlock" data-value="h1" title="Heading 1">H1</button>
+                <button class="toolbar-btn" data-command="formatBlock" data-value="h2" title="Heading 2">H2</button>
+                <button class="toolbar-btn" data-command="formatBlock" data-value="h3" title="Heading 3">H3</button>
+              </div>
+              <div class="toolbar-divider"></div>
+              <div class="toolbar-group">
+                <button class="toolbar-btn" data-command="bold" title="Bold (Ctrl+B)"><b>B</b></button>
+                <button class="toolbar-btn" data-command="italic" title="Italic (Ctrl+I)"><i>I</i></button>
+                <button class="toolbar-btn" data-command="underline" title="Underline (Ctrl+U)"><u>U</u></button>
+                <button class="toolbar-btn" data-command="strikeThrough" title="Strikethrough"><s>S</s></button>
+              </div>
+              <div class="toolbar-divider"></div>
+              <div class="toolbar-group">
+                <button class="toolbar-btn" data-command="justifyLeft" title="Align Left">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="12" x2="15" y2="12"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+                </button>
+                <button class="toolbar-btn" data-command="justifyCenter" title="Align Center">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="7" y1="12" x2="17" y2="12"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+                </button>
+                <button class="toolbar-btn" data-command="justifyRight" title="Align Right">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="9" y1="12" x2="21" y2="12"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+                </button>
+              </div>
+              <div class="toolbar-divider"></div>
+              <div class="toolbar-group">
+                <button class="toolbar-btn" data-command="formatBlock" data-value="blockquote" title="Blockquote">❞</button>
+                <button class="toolbar-btn" id="linkBtn" title="Insert Link">🔗</button>
+                <button class="toolbar-btn" id="colorBtn" title="Text Color">🎨</button>
+                <input type="color" id="colorPicker" value="#a599ff" hidden>
+              </div>
+              <div class="toolbar-divider"></div>
+              <div class="toolbar-group" style="align-items: center; padding: 0 8px;">
+                <span style="font-size: 12px; color: var(--text-muted); margin-right: 8px;">Aa</span>
+                <input type="range" id="fontSizeSlider" min="12" max="32" value="15" step="1" title="Adjust Editor Font Size" class="font-size-slider">
               </div>
             </div>
-            <input type="file" id="coverImageInput" accept="image/*" hidden>
-            <button id="removeCoverBtn" class="btn-remove-cover" style="display:none">✕</button>
+
+            <!-- Content Editor -->
+            <div id="editor" class="editor-content" contenteditable="true" data-placeholder="Start writing your script..." spellcheck="true" style="flex: 1;"></div>
           </div>
-
-          <!-- Title -->
-          <input type="text" id="scriptTitle" class="script-title-input" placeholder="Untitled Script" spellcheck="false">
-
-          <!-- Meta Bar (Date & Status) -->
-          <div class="publish-date-bar">
-            <button id="publishDateBtn" class="btn-date">
-              📅 <span id="publishDateText">Set publish date</span>
-            </button>
-            
-            <select id="scriptStatus" class="status-select">
-              <option value="pending">⏳ Pending</option>
-              <option value="finished">✅ Finished</option>
-              <option value="rejected">❌ Rejected</option>
-            </select>
-          </div>
-
-          <!-- Toolbar -->
-          <div id="toolbar" class="editor-toolbar">
-            <div class="toolbar-group">
-              <button class="toolbar-btn" data-command="bold" title="Bold (Ctrl+B)"><b>B</b></button>
-              <button class="toolbar-btn" data-command="italic" title="Italic (Ctrl+I)"><i>I</i></button>
-              <button class="toolbar-btn" data-command="underline" title="Underline (Ctrl+U)"><u>U</u></button>
-              <button class="toolbar-btn" data-command="strikeThrough" title="Strikethrough"><s>S</s></button>
-            </div>
-            <div class="toolbar-divider"></div>
-            <!-- Teleprompter moved to nav rail, removed from toolbar -->
-            <div class="toolbar-divider"></div>
-            <div class="toolbar-group">
-              <button class="toolbar-btn toolbar-btn-wide" data-command="formatBlock" data-value="h1" title="Heading 1">H1</button>
-              <button class="toolbar-btn toolbar-btn-wide" data-command="formatBlock" data-value="h2" title="Heading 2">H2</button>
-              <button class="toolbar-btn toolbar-btn-wide" data-command="formatBlock" data-value="h3" title="Heading 3">H3</button>
-            </div>
-            <div class="toolbar-divider"></div>
-            <div class="toolbar-group">
-              <button class="toolbar-btn toolbar-btn-wide" data-command="insertUnorderedList" title="Bullet List">• List</button>
-              <button class="toolbar-btn toolbar-btn-wide" data-command="insertOrderedList" title="Numbered List">1. List</button>
-            </div>
-            <div class="toolbar-divider"></div>
-            <div class="toolbar-group">
-              <button class="toolbar-btn" data-command="formatBlock" data-value="blockquote" title="Blockquote">❞</button>
-              <button class="toolbar-btn" id="linkBtn" title="Insert Link">🔗</button>
-              <button class="toolbar-btn" id="colorBtn" title="Text Color">🎨</button>
-              <input type="color" id="colorPicker" value="#a599ff" hidden>
-            </div>
-            <div class="toolbar-divider"></div>
-            <div class="toolbar-group" style="align-items: center; padding: 0 8px;">
-              <span style="font-size: 12px; color: var(--text-muted); margin-right: 8px;">Aa</span>
-              <input type="range" id="fontSizeSlider" min="12" max="32" value="15" step="1" title="Adjust Editor Font Size" class="font-size-slider">
-            </div>
-          </div>
-
-          <!-- Content Editor -->
-          <div id="editor" class="editor-content" contenteditable="true" data-placeholder="Start writing your script..." spellcheck="true"></div>
-
-          <!-- Custom Context Menu -->
-          <div id="editorContextMenu" class="editor-context-menu" hidden>
-            <button class="ctx-menu-item" data-action="bold"><b>B</b>&nbsp;&nbsp;Bold</button>
-            <button class="ctx-menu-item" data-action="italic"><i>I</i>&nbsp;&nbsp;Italic</button>
-            <button class="ctx-menu-item" data-action="highlight">🖍️&nbsp;&nbsp;Highlight</button>
-            <button class="ctx-menu-item" data-action="remove-highlight">🧹&nbsp;&nbsp;Clear Highlight</button>
-            <div class="ctx-menu-divider"></div>
-            <button class="ctx-menu-item" data-action="make-part">📝&nbsp;&nbsp;Make Part</button>
-          </div>
-
-          <!-- Part Context Menu -->
-          <div id="partContextMenu" class="editor-context-menu" hidden>
-            <button class="ctx-menu-item" data-action="print-part">🖨️&nbsp;&nbsp;Print Part</button>
-            <button class="ctx-menu-item" data-action="change-color">🎨&nbsp;&nbsp;Change Color</button>
-            <div class="ctx-menu-divider"></div>
-            <button class="ctx-menu-item" data-action="delete-part" style="color: #ff6b81;">🗑️&nbsp;&nbsp;Delete Part</button>
-          </div>
-
-          <!-- Find & Replace Panel -->
-          <div id="findReplacePanel" class="find-replace-panel" hidden>
-            <div class="find-replace-header">
-              <span id="findReplaceTitle">Find & Replace</span>
-              <button id="closeFindReplaceBtn" class="btn-icon">✕</button>
-            </div>
-            <div class="find-replace-body">
-              <div class="input-group">
-                <input type="text" id="findInput" placeholder="Find..." />
-                <span id="findMatchCount" class="match-count">0/0</span>
-              </div>
-              <div class="input-group" id="replaceGroup">
-                <input type="text" id="replaceInput" placeholder="Replace with..." />
-              </div>
-              <div class="find-replace-actions">
-                <button id="findPrevBtn" class="btn-secondary" title="Previous match">↑</button>
-                <button id="findNextBtn" class="btn-secondary" title="Next match">↓</button>
-                <button id="replaceBtn" class="btn-secondary" title="Replace current match">Replace</button>
-                <button id="replaceAllBtn" class="btn-secondary" title="Replace all matches">Replace All</button>
-              </div>
-            </div>
+          
+          <!-- Editor Footer (Stats) -->
+          <div class="editor-footer" style="padding: 10px 24px; display: flex; gap: 16px; color: var(--text-muted); font-size: 12px; border-top: 1px solid var(--glass-border); background: var(--bg-secondary); z-index: 50; flex-shrink: 0; box-shadow: 0 -4px 12px rgba(0,0,0,0.15);">
+            <span id="wordCount">0 words</span>
+            <span id="readingTime">~0 min read</span>
           </div>
         </div>
 
-        <!-- Parts Sidebar -->
-        <div id="partsSidebar" class="parts-sidebar">
-          <div class="parts-sidebar-header">
-            <h3>📑 Script Parts</h3>
+        <!-- Tools Sidebar (formerly Parts Sidebar) -->
+        <div id="toolsSidebar" class="tools-sidebar">
+          
+          <!-- Tab Navigation -->
+          <div class="tools-tabs">
+            <button class="tools-tab-btn active" data-tab="insert">Insert</button>
+            <button class="tools-tab-btn" data-tab="parts">Parts</button>
           </div>
-          <div class="parts-sidebar-body">
-            <p class="parts-hint">Select text in editor → Right click → <b>Make Part</b></p>
-            <div id="partsList" class="parts-list">
-              <!-- Part items will be injected here -->
+
+          <!-- Tab Panels -->
+          <div class="tools-panels">
+            
+            <!-- Insert Tab -->
+            <div id="tab-insert" class="tools-panel active">
+              <div class="insert-section">
+                <span class="insert-section-title">Basic</span>
+                <button class="insert-block-btn" data-block="text">
+                  <span class="block-icon">Aa</span> Text
+                </button>
+              </div>
+
+              <div class="insert-section">
+                <span class="insert-section-title">Media</span>
+                <button class="insert-block-btn" data-block="image">
+                  <span class="block-icon">🖼️</span> Image
+                </button>
+                <button class="insert-block-btn" data-block="broll">
+                  <span class="block-icon">🎥</span> B-Roll Marker
+                </button>
+              </div>
+
+              <div class="insert-section">
+                <span class="insert-section-title">Advanced</span>
+                <button class="insert-block-btn" data-block="code">
+                  <span class="block-icon">{' '}</span> Code Block
+                </button>
+              </div>
+
+              <div class="insert-section">
+                <span class="insert-section-title">Collections</span>
+                <button class="insert-block-btn" data-block="table">
+                  <span class="block-icon">▦</span> Table
+                </button>
+              </div>
+
+              <div class="insert-section">
+                <span class="insert-section-title">Divider</span>
+                <button class="insert-block-btn" data-block="line">
+                  <span class="block-icon">―</span> Horizontal Line
+                </button>
+              </div>
+              <input type="file" id="insertImageInput" accept="image/*" hidden>
             </div>
+
+            <!-- Parts Tab (Original functionality) -->
+            <div id="tab-parts" class="tools-panel">
+              <div class="parts-sidebar-header">
+                <h3>📑 Script Parts</h3>
+              </div>
+              <div class="parts-sidebar-body">
+                <p class="parts-hint">Select text in editor → Right click → <b>Make Part</b></p>
+                <div id="partsList" class="parts-list">
+                  <!-- Part items will be injected here -->
+                </div>
+              </div>
+            </div>
+
           </div>
         </div>
 
@@ -237,12 +280,251 @@
         </div>
       </div>
 
+      <!-- ──── Statistics View ──── -->
+      <div id="statsView" class="view">
+        <div class="stats-dashboard">
+          <div class="stats-header">
+            <h2 class="stats-title">📊 Statistics & Analytics</h2>
+            <p class="stats-subtitle">Detailed performance insights for your content pipeline</p>
+          </div>
+
+          <!-- Top KPI Cards Row -->
+          <div class="stats-kpi-row">
+            <div class="stats-kpi-card">
+              <div class="kpi-icon" style="background: rgba(102,187,106,0.15); color: #66bb6a;">📄</div>
+              <div class="kpi-info">
+                <span class="kpi-value" id="statsTotalScripts">0</span>
+                <span class="kpi-label">Total Scripts</span>
+              </div>
+            </div>
+            <div class="stats-kpi-card">
+              <div class="kpi-icon" style="background: rgba(66,165,245,0.15); color: #42a5f5;">✅</div>
+              <div class="kpi-info">
+                <span class="kpi-value" id="statsFinished">0</span>
+                <span class="kpi-label">Videos Uploaded</span>
+              </div>
+            </div>
+            <div class="stats-kpi-card">
+              <div class="kpi-icon" style="background: rgba(255,167,38,0.15); color: #ffa726;">⏳</div>
+              <div class="kpi-info">
+                <span class="kpi-value" id="statsPending">0</span>
+                <span class="kpi-label">Pending</span>
+              </div>
+            </div>
+            <div class="stats-kpi-card">
+              <div class="kpi-icon" style="background: rgba(244,67,54,0.15); color: #f44336;">❌</div>
+              <div class="kpi-info">
+                <span class="kpi-value" id="statsRejected">0</span>
+                <span class="kpi-label">Rejected</span>
+              </div>
+            </div>
+            <div class="stats-kpi-card">
+              <div class="kpi-icon" style="background: rgba(171,71,188,0.15); color: #ab47bc;">🗑️</div>
+              <div class="kpi-info">
+                <span class="kpi-value" id="statsTrashed">0</span>
+                <span class="kpi-label">Trashed</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Charts Row -->
+          <div class="stats-charts-row">
+            <div class="stats-chart-card">
+              <h3 class="stats-section-title">📈 Upload Timeline (Monthly)</h3>
+              <canvas id="statsMonthlyChart" width="600" height="260"></canvas>
+            </div>
+            <div class="stats-chart-card">
+              <h3 class="stats-section-title">🥧 Status Distribution</h3>
+              <canvas id="statsDonutChart" width="280" height="260"></canvas>
+            </div>
+          </div>
+
+          <!-- Weekly Consistency Chart -->
+          <div class="stats-chart-card stats-full-width">
+            <h3 class="stats-section-title">📅 Weekly Upload Consistency (Last 12 Weeks)</h3>
+            <canvas id="statsWeeklyChart" width="900" height="200"></canvas>
+          </div>
+
+          <!-- Detailed Dropdown Sections -->
+          <div class="stats-details">
+
+            <!-- Dropdown: Upload History by Date -->
+            <div class="stats-dropdown">
+              <button class="stats-dropdown-header" data-target="statsDateBreakdown">
+                <span>📆 Date-wise Upload History</span>
+                <span class="stats-dropdown-arrow">▼</span>
+              </button>
+              <div id="statsDateBreakdown" class="stats-dropdown-body" hidden>
+                <div id="statsDateTable" class="stats-table-wrap"></div>
+              </div>
+            </div>
+
+            <!-- Dropdown: Monthly Breakdown -->
+            <div class="stats-dropdown">
+              <button class="stats-dropdown-header" data-target="statsMonthlyBreakdown">
+                <span>📅 Monthly Breakdown</span>
+                <span class="stats-dropdown-arrow">▼</span>
+              </button>
+              <div id="statsMonthlyBreakdown" class="stats-dropdown-body" hidden>
+                <div id="statsMonthlyTable" class="stats-table-wrap"></div>
+              </div>
+            </div>
+
+            <!-- Dropdown: Script Length Analysis -->
+            <div class="stats-dropdown">
+              <button class="stats-dropdown-header" data-target="statsLengthBreakdown">
+                <span>📏 Script Length Analysis</span>
+                <span class="stats-dropdown-arrow">▼</span>
+              </button>
+              <div id="statsLengthBreakdown" class="stats-dropdown-body" hidden>
+                <div id="statsLengthInfo" class="stats-info-grid"></div>
+              </div>
+            </div>
+
+            <!-- Dropdown: Rejection Report -->
+            <div class="stats-dropdown">
+              <button class="stats-dropdown-header" data-target="statsRejectionBreakdown">
+                <span>🚫 Rejection Report</span>
+                <span class="stats-dropdown-arrow">▼</span>
+              </button>
+              <div id="statsRejectionBreakdown" class="stats-dropdown-body" hidden>
+                <div id="statsRejectionInfo" class="stats-table-wrap"></div>
+              </div>
+            </div>
+
+            <!-- Dropdown: Upload Consistency -->
+            <div class="stats-dropdown">
+              <button class="stats-dropdown-header" data-target="statsConsistencyBreakdown">
+                <span>🔥 Upload Consistency & Streaks</span>
+                <span class="stats-dropdown-arrow">▼</span>
+              </button>
+              <div id="statsConsistencyBreakdown" class="stats-dropdown-body" hidden>
+                <div id="statsConsistencyInfo" class="stats-info-grid"></div>
+              </div>
+            </div>
+
+            <!-- Dropdown: Status-wise Summary -->
+            <div class="stats-dropdown">
+              <button class="stats-dropdown-header" data-target="statsStatusSummary">
+                <span>📋 Status-wise Detailed Summary</span>
+                <span class="stats-dropdown-arrow">▼</span>
+              </button>
+              <div id="statsStatusSummary" class="stats-dropdown-body" hidden>
+                <div id="statsStatusInfo" class="stats-table-wrap"></div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      <!-- ──── Google Drive Sync View ──── -->
+      <div id="driveView" class="view">
+        <div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: radial-gradient(circle at center, rgba(37, 99, 235, 0.05) 0%, transparent 60%); padding: 20px; overflow-y: auto;">
+          <div style="width: 100%; max-width: 500px; display: flex; flex-direction: column; gap: 24px;">
+            
+            <!-- Not Connected State -->
+            <div id="driveNotConnectedState" style="text-align: center;">
+              <div style="width: 96px; height: 96px; background: rgba(66, 165, 245, 0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 24px auto; box-shadow: 0 0 40px rgba(66, 165, 245, 0.2);">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#42a5f5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M17.5 19a5.5 5.5 0 0 0 0-11 5.5 5.5 0 0 0-11 0A5.5 5.5 0 0 0 6.5 19h11z"></path>
+                </svg>
+              </div>
+              <h2 style="font-size: 28px; font-weight: 700; color: #fff; margin: 0 0 12px 0;">Backup to Cloud</h2>
+              <p style="font-size: 15px; color: #a1a1aa; line-height: 1.6; margin: 0 0 32px 0;">
+                Securely store your video scripts in a dedicated "ScriptManager" folder on your Google Drive as readable Markdown files. Never lose a script again.
+              </p>
+              <button id="driveConnectBtn" class="btn-primary" style="width: 100%; padding: 16px; font-size: 16px; font-weight: 600; border-radius: 12px; justify-content: center; background: linear-gradient(135deg, #2563eb, #4f46e5); border: none; box-shadow: 0 8px 24px rgba(37, 99, 235, 0.4);">
+                Connect Google Account
+              </button>
+              <div id="driveConnectingLoader" style="display: none; margin-top: 20px; color: #818cf8; font-size: 14px; font-weight: 500; text-transform: uppercase; letter-spacing: 1px; animation: pulse 2s infinite;">
+                Waiting for authentication...
+              </div>
+            </div>
+
+            <!-- Connected State -->
+            <div id="driveConnectedState" style="display: none;">
+              <div style="text-align: center; margin-bottom: 32px;">
+                <div style="width: 80px; height: 80px; background: rgba(16, 185, 129, 0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px auto; box-shadow: 0 0 30px rgba(16, 185, 129, 0.2);">
+                  <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M17.5 19a5.5 5.5 0 0 0 0-11 5.5 5.5 0 0 0-11 0A5.5 5.5 0 0 0 6.5 19h11z"></path>
+                    <polyline points="9 13 11 15 15 10"></polyline>
+                  </svg>
+                </div>
+                <h2 style="font-size: 24px; font-weight: 700; color: #fff; margin: 0 0 8px 0;">Google Drive Connected</h2>
+                <div id="driveEmailText" style="display: inline-flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); padding: 6px 16px; border-radius: 20px; font-size: 14px; color: #e4e4e7; font-weight: 500;"></div>
+              </div>
+              
+              <!-- Action Card -->
+              <div style="background: rgba(30, 30, 42, 0.7); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.08); border-radius: 20px; padding: 28px; box-shadow: 0 16px 40px rgba(0,0,0,0.3);">
+                <div style="display: flex; flex-direction: column; gap: 20px;">
+                  
+                  <!-- Sync Info -->
+                  <div>
+                    <h3 style="font-size: 18px; font-weight: 600; color: #fff; margin: 0 0 4px 0;">Manual Backup</h3>
+                    <p style="font-size: 14px; color: #a1a1aa; margin: 0;">Sync all your local scripts to the cloud.</p>
+                  </div>
+
+                  <button id="driveSyncNowBtn" class="btn-primary" style="width: 100%; padding: 14px; font-size: 16px; font-weight: 600; border-radius: 12px; justify-content: center; background: linear-gradient(135deg, #3b82f6, #6366f1); border: none; box-shadow: 0 8px 24px rgba(59, 130, 246, 0.3);">
+                    Sync Now
+                  </button>
+
+                  <div style="display: flex; align-items: center; justify-content: space-between; font-size: 13px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.05);">
+                    <span style="color: #71717a;">Last Backup:</span>
+                    <span id="driveLastBackupText" style="color: #e4e4e7; font-weight: 500;">Never</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Sync Progress -->
+              <div id="driveSyncProgressContainer" style="display: none; background: rgba(30, 30, 42, 0.9); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 20px; padding: 24px; margin-top: 16px; box-shadow: 0 16px 40px rgba(0,0,0,0.4);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                  <div style="color: #fff; font-size: 15px; font-weight: 600; display: flex; align-items: center; gap: 8px;">
+                    <div style="width: 8px; height: 8px; background: #3b82f6; border-radius: 50%; box-shadow: 0 0 10px #3b82f6; animation: pulse 1.5s infinite;"></div>
+                    Syncing to Drive...
+                  </div>
+                  <div id="driveProgressPercent" style="color: #60a5fa; font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums;">0%</div>
+                </div>
+                <div style="width: 100%; height: 8px; background: rgba(255,255,255,0.05); border-radius: 4px; overflow: hidden; margin-bottom: 12px; box-shadow: inset 0 1px 3px rgba(0,0,0,0.5);">
+                  <div id="driveProgressBar" style="width: 0%; height: 100%; background: linear-gradient(90deg, #3b82f6, #8b5cf6); border-radius: 4px; transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1); box-shadow: 0 0 10px rgba(59, 130, 246, 0.5);"></div>
+                </div>
+                <div id="driveProgressText" style="font-size: 13px; color: #a1a1aa; text-align: center;">Preparing files...</div>
+              </div>
+
+              <!-- Disconnect -->
+              <div style="text-align: center; margin-top: 32px;">
+                <button id="driveDisconnectBtn" class="btn-secondary" style="color: #ef4444; border-color: rgba(239, 68, 68, 0.2); background: transparent;">
+                  Disconnect Account
+                </button>
+              </div>
+            </div>
+            
+          </div>
+        </div>
+      </div>
+
       <!-- ──── Empty State ──── -->
       <div id="emptyState" class="empty-state">
-        <div class="empty-icon">📝</div>
+        <div class="empty-icon">
+          <svg width="120" height="120" viewBox="0 0 24 24" fill="none" stroke="url(#softGradient)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <defs>
+              <linearGradient id="softGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#a5b4fc" />
+                <stop offset="100%" stop-color="#818cf8" />
+              </linearGradient>
+            </defs>
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <line x1="16" y1="13" x2="8" y2="13"></line>
+            <line x1="16" y1="17" x2="8" y2="17"></line>
+            <polyline points="10 9 9 9 8 9"></polyline>
+          </svg>
+        </div>
         <h2>No Scripts Yet</h2>
-        <p>Create your first script to get started organizing your video projects</p>
-        <button id="emptyNewBtn" class="btn-primary">+ Create New Script</button>
+        <p>Create your first script to get started organizing your video projects and unleash your creativity.</p>
+        <button id="emptyNewBtn" class="btn-primary" style="padding: 12px 24px; font-size: 16px; border-radius: 99px; margin-top: 8px; box-shadow: 0 4px 16px rgba(129,140,248,0.3);">
+          + Create New Script
+        </button>
       </div>
 
     </main>
@@ -250,47 +532,182 @@
 
   <!-- ═══════════════ Teleprompter Overlay ═══════════════ -->
   <div id="teleprompterOverlay" class="teleprompter-overlay" hidden>
-    <div class="tp-controls">
-      <button id="tpBackBtn" class="btn-secondary">⬅ Back to Editor</button>
-      
-      <div class="tp-control-group" id="tpPartGroup" style="display:none; align-items:center;">
-        <label for="tpPartSelect" style="margin-right: 8px;">Part</label>
-        <select id="tpPartSelect" class="status-select" style="min-width: 90px;"></select>
-      </div>
-
-      <div class="tp-control-group">
-        <label for="tpSpeedSlider">Speed</label>
-        <input type="range" id="tpSpeedSlider" min="0.2" max="1" step="0.05" value="0.5">
-      </div>
-      
-      <div class="tp-control-group">
-        <label for="tpMarginSlider" title="Side margins">Margin</label>
-        <input type="range" id="tpMarginSlider" min="0" max="40" step="1" value="15">
-      </div>
-
-      <div class="tp-control-group">
-        <label for="tpLineHeightSlider" title="Vertical line spacing">V-Gap</label>
-        <input type="range" id="tpLineHeightSlider" min="1" max="4" step="0.1" value="1.6">
-      </div>
-
-      <div class="tp-control-group">
-        <label for="tpLetterSpacingSlider" title="Horizontal letter spacing">H-Gap</label>
-        <input type="range" id="tpLetterSpacingSlider" min="0" max="10" step="0.5" value="0">
-      </div>
-
-      <div class="tp-control-group">
-        <label for="tpFontSizeSlider">Size</label>
-        <input type="range" id="tpFontSizeSlider" min="24" max="96" step="2" value="48">
-      </div>
-      
-      <button id="tpMirrorBtn" class="btn-secondary" title="Mirror text horizontally">🪞 Mirror</button>
-      <button id="tpFlipBtn" class="btn-secondary" title="Flip text vertically">🔄 Flip</button>
-      <button id="tpPlayPauseBtn" class="btn-primary">▶ Play (Space)</button>
-    </div>
     
+    <!-- Floating Dynamic Island HUD -->
+    <div class="tphud-bar-wrapper">
+      <div class="tphud-bar">
+        <button id="tpBackBtn" class="tphud-icon-btn" title="Back to Editor">
+          <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+        </button>
+        
+        <div class="tphud-divider"></div>
+        
+        <div class="tphud-timer-box">
+          <div class="tphud-time">⏱️ <span id="tpElapsedTime">00:00</span></div>
+          <div class="tphud-eta">ETA <span id="tpEtaTime">--:--</span></div>
+        </div>
+        
+        <div class="tphud-divider"></div>
+        
+        <div id="tpPartGroup" class="tphud-part-group" style="display:none;">
+          <select id="tpPartSelect" class="status-select" style="min-width: 90px; border:none; background:transparent; padding:0; box-shadow:none; padding-right: 20px;"></select>
+        </div>
+        
+        <div class="tphud-divider"></div>
+        
+        <button id="tpSettingsToggleBtn" class="tphud-icon-btn" title="Settings">
+          <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Floating Play/Pause FAB -->
+    <button id="tpPlayPauseBtn" class="tphud-fab">
+      <svg class="play-icon" width="32" height="32" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+      <svg class="pause-icon" width="32" height="32" fill="currentColor" viewBox="0 0 24 24" style="display:none;"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+    </button>
+
+    <!-- Side Settings Drawer -->
+    <div id="tpSettingsDrawer" class="tphud-drawer">
+      <div class="drawer-header">
+        <h3>Teleprompter Settings</h3>
+        <button id="tpSettingsCloseBtn" class="modal-close">✕</button>
+      </div>
+      <div class="drawer-body">
+        
+        <div class="tp-settings-section">
+          <h4>Display Theme</h4>
+          <div class="tp-theme-selector">
+            <button class="theme-btn active" data-theme="default">Classic</button>
+            <button class="theme-btn" data-theme="high-contrast">High Contrast</button>
+            <button class="theme-btn" data-theme="light">Light</button>
+          </div>
+          <div class="tp-control-row" style="margin-top: 16px;">
+            <label>Font Weight</label>
+            <select id="tpFontWeightSelect" class="status-select">
+              <option value="normal">Normal</option>
+              <option value="bold">Bold</option>
+              <option value="900">Heavy</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="tp-settings-section">
+          <h4>Shortcuts & Remotes (Clickers)</h4>
+          <button id="tpShowQRBtn" class="btn-primary" style="width: 100%; margin-bottom: 16px; justify-content: center; background: #2563eb; border-color: #3b82f6;">
+            📱 Connect Mobile Remote
+          </button>
+          
+          <label class="switch-row" style="margin-bottom: 12px;">
+            <span>Enable Bluetooth Clicker Mode</span>
+            <input type="checkbox" id="tpBluetoothToggle">
+            <span class="slider round"></span>
+          </label>
+          <p style="font-size:11px; color:#a1a1aa; margin-bottom:12px; margin-top:-4px;">Turn on to use custom clicker bindings. When off, defaults apply.</p>
+          <div class="tp-shortcut-grid">
+            <div class="shortcut-item">
+              <span>Play / Pause</span>
+              <button class="shortcut-btn" data-action="playPause" id="scPlayPause">Space</button>
+            </div>
+            <div class="shortcut-item">
+              <span>Speed Up</span>
+              <button class="shortcut-btn" data-action="speedUp" id="scSpeedUp">ArrowUp</button>
+            </div>
+            <div class="shortcut-item">
+              <span>Speed Down</span>
+              <button class="shortcut-btn" data-action="speedDown" id="scSpeedDown">ArrowDown</button>
+            </div>
+            <div class="shortcut-item">
+              <span>Manual Scroll Up</span>
+              <button class="shortcut-btn" data-action="scrollUp" id="scScrollUp">PageUp</button>
+            </div>
+            <div class="shortcut-item">
+              <span>Manual Scroll Down</span>
+              <button class="shortcut-btn" data-action="scrollDown" id="scScrollDown">PageDown</button>
+            </div>
+            <div class="shortcut-item">
+              <span>Exit Teleprompter</span>
+              <button class="shortcut-btn" data-action="exit" id="scExit">Escape</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="tp-settings-section">
+          <h4>Focus & Eyeline</h4>
+          <label class="switch-row">
+            <span>Show Eyeline Indicator</span>
+            <input type="checkbox" id="tpEyelineToggle">
+            <span class="slider round"></span>
+          </label>
+        </div>
+
+        <div class="tp-settings-section">
+          <h4>Speed & Layout</h4>
+          <div class="tp-control-group">
+            <label>Scroll Speed</label>
+            <input type="range" id="tpSpeedSlider" min="10" max="250" step="1" value="70">
+          </div>
+          <div class="tp-control-group">
+            <label>Text Size</label>
+            <input type="range" id="tpFontSizeSlider" min="24" max="96" step="2" value="48">
+          </div>
+          <div class="tp-control-group">
+            <label>Side Margins</label>
+            <input type="range" id="tpMarginSlider" min="0" max="40" step="1" value="15">
+          </div>
+          <div class="tp-control-group">
+            <label>Line Spacing</label>
+            <input type="range" id="tpLineHeightSlider" min="1" max="4" step="0.1" value="1.6">
+          </div>
+          <div class="tp-control-group">
+            <label>Letter Spacing</label>
+            <input type="range" id="tpLetterSpacingSlider" min="0" max="10" step="0.5" value="0">
+          </div>
+        </div>
+
+        <div class="tp-settings-section">
+          <h4>Transform</h4>
+          <div style="display:flex; gap: 8px;">
+            <button id="tpMirrorBtn" class="btn-secondary" style="flex:1">🪞 Mirror</button>
+            <button id="tpFlipBtn" class="btn-secondary" style="flex:1">🔄 Flip</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quick Chapters Sidebar -->
+    <div id="tpChaptersSidebar" class="tphud-chapters" hidden>
+      <!-- Generated dynamically -->
+    </div>
+
+    <!-- Eyeline Overlay -->
+    <div id="tpEyelineOverlay" class="tp-eyeline" hidden>
+      <div class="eyeline-mask top-mask"></div>
+      <div class="eyeline-center"></div>
+      <div class="eyeline-mask bottom-mask"></div>
+    </div>
+
+    <!-- Main Scroll Area -->
     <div id="tpScrollArea" class="tp-scroll-area">
       <div id="tpContent" class="tp-content"></div>
       <div class="tp-padding-bottom"></div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ Mobile Remote QR Modal ═══════════════ -->
+  <div id="qrModal" class="modal-overlay" hidden style="z-index: 9999;">
+    <div class="modal" style="text-align: center; max-width: 320px;">
+      <div class="modal-header">
+        <h3>📱 Mobile Remote</h3>
+        <button class="modal-close" data-modal="qrModal">✕</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size: 13px; color: #a1a1aa; margin-bottom: 16px;">Scan this QR code with your phone camera to control the teleprompter.</p>
+        <div id="qrCodeContainer" style="background: white; padding: 16px; border-radius: 12px; display: inline-block; margin-bottom: 16px;">
+          <!-- QR Code Image will be injected here -->
+        </div>
+        <p id="qrUrlText" style="font-size: 12px; font-family: monospace; color: #7c3aed; word-break: break-all;"></p>
+      </div>
     </div>
   </div>
 
@@ -386,6 +803,57 @@
       <div class="prompt-actions mui-dialog-actions">
         <button id="customPromptCancel" class="btn-secondary mui-btn mui-btn-text">Cancel</button>
         <button id="customPromptOk" class="btn-primary mui-btn mui-btn-contained">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Custom Context Menu -->
+  <div id="editorContextMenu" class="editor-context-menu" hidden>
+    <button class="ctx-menu-item" data-action="bold"><b>B</b>&nbsp;&nbsp;Bold</button>
+    <button class="ctx-menu-item" data-action="italic"><i>I</i>&nbsp;&nbsp;Italic</button>
+    <button class="ctx-menu-item" data-action="highlight">🖍️&nbsp;&nbsp;Highlight</button>
+    <button class="ctx-menu-item" data-action="remove-highlight">🧹&nbsp;&nbsp;Clear Highlight</button>
+    <div class="ctx-menu-divider"></div>
+    <button class="ctx-menu-item" data-action="make-part">📝&nbsp;&nbsp;Make Part</button>
+    
+    <!-- Table Controls (hidden by default) -->
+    <div class="ctx-menu-divider table-control" style="display: none;"></div>
+    <button class="ctx-menu-item table-control" data-action="insert-row-above" style="display: none;">➕&nbsp;&nbsp;Insert Row Above</button>
+    <button class="ctx-menu-item table-control" data-action="insert-row-below" style="display: none;">➕&nbsp;&nbsp;Insert Row Below</button>
+    <button class="ctx-menu-item table-control" data-action="insert-col-left" style="display: none;">➕&nbsp;&nbsp;Insert Column Left</button>
+    <button class="ctx-menu-item table-control" data-action="insert-col-right" style="display: none;">➕&nbsp;&nbsp;Insert Column Right</button>
+    <div class="ctx-menu-divider table-control" style="display: none;"></div>
+    <button class="ctx-menu-item table-control" data-action="delete-row" style="color: #ff6b81; display: none;">🗑️&nbsp;&nbsp;Delete Row</button>
+    <button class="ctx-menu-item table-control" data-action="delete-col" style="color: #ff6b81; display: none;">🗑️&nbsp;&nbsp;Delete Column</button>
+  </div>
+
+  <!-- Part Context Menu -->
+  <div id="partContextMenu" class="editor-context-menu" hidden>
+    <button class="ctx-menu-item" data-action="print-part">🖨️&nbsp;&nbsp;Print Part</button>
+    <button class="ctx-menu-item" data-action="change-color">🎨&nbsp;&nbsp;Change Color</button>
+    <div class="ctx-menu-divider"></div>
+    <button class="ctx-menu-item" data-action="delete-part" style="color: #ff6b81;">🗑️&nbsp;&nbsp;Delete Part</button>
+  </div>
+
+  <!-- Find & Replace Panel -->
+  <div id="findReplacePanel" class="find-replace-panel" hidden>
+    <div class="find-replace-header">
+      <span id="findReplaceTitle">Find & Replace</span>
+      <button id="closeFindReplaceBtn" class="btn-icon">✕</button>
+    </div>
+    <div class="find-replace-body">
+      <div class="input-group">
+        <input type="text" id="findInput" placeholder="Find..." />
+        <span id="findMatchCount" class="match-count">0/0</span>
+      </div>
+      <div class="input-group" id="replaceGroup">
+        <input type="text" id="replaceInput" placeholder="Replace with..." />
+      </div>
+      <div class="find-replace-actions">
+        <button id="findPrevBtn" class="btn-secondary" title="Previous match">↑</button>
+        <button id="findNextBtn" class="btn-secondary" title="Next match">↓</button>
+        <button id="replaceBtn" class="btn-secondary" title="Replace current match">Replace</button>
+        <button id="replaceAllBtn" class="btn-secondary" title="Replace all matches">Replace All</button>
       </div>
     </div>
   </div>

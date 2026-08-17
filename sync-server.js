@@ -91,6 +91,49 @@ function startSyncServer(mainWindow) {
     }
   });
 
+  // ── Sync Data ──
+  app.post('/api/sync', (req, res) => {
+    try {
+      const payload = req.body;
+      if (payload && payload.scripts) {
+        // Read existing to keep metadata if needed, but for now just overwrite scripts
+        const data = readData();
+        data.scripts = payload.scripts;
+        fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2), 'utf8');
+        
+        // Notify main window to refresh
+        if (mainWindowRef) {
+          mainWindowRef.webContents.send('sync-updated');
+        }
+        res.json({ success: true });
+      } else {
+        res.status(400).json({ error: 'Invalid payload' });
+      }
+    } catch (e) {
+      console.error(e);
+      res.status(500).json({ error: 'Failed to sync data' });
+    }
+  });
+
+  // ── Mobile Remote UI ──
+  app.get('/remote', (req, res) => {
+    res.sendFile(path.join(__dirname, 'remote.html'));
+  });
+
+  // ── Mobile Remote Action ──
+  app.post('/api/tp/action', (req, res) => {
+    try {
+      if (mainWindowRef && req.body && req.body.action) {
+        mainWindowRef.webContents.send('tp-remote-action', req.body.action);
+        res.json({ success: true });
+      } else {
+        res.status(400).json({ error: 'Invalid action' });
+      }
+    } catch (e) {
+      res.status(500).json({ error: 'Failed to send action' });
+    }
+  });
+
   // ── Delete Single Script ──
   app.delete('/api/script/:id', (req, res) => {
     try {

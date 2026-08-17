@@ -38,12 +38,24 @@
     tpIsPlaying: false,
     tpMirrored: false,
     tpFlipped: false,
+    tpBluetoothMode: false,
+    tpShortcuts: {
+      playPause: 'Space',
+      speedUp: 'ArrowUp',
+      speedDown: 'ArrowDown',
+      scrollUp: 'PageUp',
+      scrollDown: 'PageDown',
+      exit: 'Escape'
+    },
+    driveConnectedEmail: null,
+    driveLastBackup: null
   };
 
   let tpAnimationId = null;
   let tpLastTimestamp = null;
   let tpExactScrollTop = 0;
   let savedSelectionRange = null;
+  let serverIP = '';
 
   // ── DOM Helpers ────────────────────────────────────────────
   const $ = (sel) => document.querySelector(sel);
@@ -106,7 +118,18 @@
         const data = JSON.parse(raw);
         state.scripts = data.scripts || [];
         state.editorFontSize = data.editorFontSize || 15;
-        state.theme = data.theme || 'dark';
+        state = { ...state, ...data };
+        // Ensure shortcuts object exists (for backwards compatibility)
+        if (!state.tpShortcuts) {
+          state.tpShortcuts = {
+            playPause: 'Space',
+            speedUp: 'ArrowUp',
+            speedDown: 'ArrowDown',
+            scrollUp: 'PageUp',
+            scrollDown: 'PageDown',
+            exit: 'Escape'
+          };
+        }
         if (state.scripts.length > 0 && !state.activeScriptId) {
           state.activeScriptId = state.scripts[0].id;
         }
@@ -145,14 +168,30 @@
   function deleteScript(id) {
     const idx = state.scripts.findIndex((s) => s.id === id);
     if (idx === -1) return;
-    const title = state.scripts[idx].title || 'Untitled Script';
-    state.scripts.splice(idx, 1);
-    if (state.activeScriptId === id) {
-      state.activeScriptId = state.scripts.length > 0 ? state.scripts[0].id : null;
+    
+    const script = state.scripts[idx];
+    const title = script.title || 'Untitled Script';
+    
+    if (script.status === 'deleted') {
+       // Permanent delete
+       state.scripts.splice(idx, 1);
+       if (state.activeScriptId === id) {
+         const nextScript = state.scripts.find(s => s.status === 'deleted');
+         state.activeScriptId = nextScript ? nextScript.id : null;
+       }
+       showToast(`"${title}" permanently deleted`, 'info');
+    } else {
+       // Move to trash
+       script.status = 'deleted';
+       if (state.activeScriptId === id) {
+         const nextScript = state.scripts.find(s => s.status !== 'deleted');
+         state.activeScriptId = nextScript ? nextScript.id : null;
+       }
+       showToast(`"${title}" moved to Trash`, 'info');
     }
+    
     save();
     render();
-    showToast(`"${title}" deleted`, 'info');
   }
 
   function getScript(id) {
@@ -179,19 +218,49 @@
     }
   }
 
+  async function translateToEnglish(text) {
+    if (!text || text.trim() === '') return '';
+    try {
+      const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=en&dt=t&q=${encodeURIComponent(text)}`;
+      const res = await fetch(url);
+      const data = await res.json();
+      if (data && data[0] && data[0][0]) {
+        return data[0][0][0] || '';
+      }
+    } catch (e) {
+      console.error('Translation failed:', e);
+    }
+    return '';
+  }
+
   function saveCurrentEditorContent() {
     const script = getActiveScript();
     if (!script) return;
     const editor = $('#editor');
     const titleInput = $('#scriptTitle');
+    let titleChanged = false;
+
     if (editor) {
       script.content = editor.innerHTML;
     }
     if (titleInput) {
+      if (script.title !== titleInput.value) {
+        titleChanged = true;
+      }
       script.title = titleInput.value;
     }
     script.updatedAt = new Date().toISOString();
     save();
+
+    if (titleChanged) {
+      // Background translation for smart search
+      translateToEnglish(script.title).then(enText => {
+        if (enText && enText.toLowerCase() !== script.title.toLowerCase()) {
+          script.titleEn = enText;
+          save();
+        }
+      });
+    }
   }
 
   // ── Auto-save (debounced) ──────────────────────────────────
@@ -219,12 +288,16 @@
       filtered = filtered.filter(
         (s) =>
           (s.title || '').toLowerCase().includes(query) ||
+          (s.titleEn || '').toLowerCase().includes(query) ||
           (s.content || '').toLowerCase().includes(query)
       );
     }
     
     if (state.statusFilter !== 'all') {
       filtered = filtered.filter((s) => (s.status || 'pending') === state.statusFilter);
+    } else {
+      // If 'all', do not show deleted scripts
+      filtered = filtered.filter((s) => s.status !== 'deleted');
     }
 
     if (filtered.length === 0) {
@@ -233,7 +306,10 @@
           No scripts found
         </div>`;
     } else {
-      listEl.innerHTML = filtered
+      const limit = state.visibleScriptsCount || 20;
+      const visible = filtered.slice(0, limit);
+      
+      let html = visible
         .map(
           (s, i) => `
         <div class="script-item ${s.id === state.activeScriptId ? 'active' : ''}" 
@@ -247,6 +323,12 @@
           </div>
           <div class="script-item-info">
             <div class="script-item-title">${s.title || 'Untitled Script'}</div>
+            <div class="script-item-excerpt" style="font-size: 11px; color: var(--text-muted); margin: 2px 0 6px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+              ${(() => {
+                const text = (s.content || '').replace(/<[^>]*>?/gm, ' ').replace(/\s+/g, ' ').trim();
+                return text ? text : 'No content...';
+              })()}
+            </div>
             <div class="script-item-meta">
               <span class="script-item-status status-${s.status || 'pending'}">${(s.status || 'pending').toUpperCase()}</span>
               <span class="script-item-date ${s.publishDate ? 'has-date' : ''}">
@@ -257,6 +339,12 @@
         </div>`
         )
         .join('');
+        
+      if (filtered.length > limit) {
+        html += `<button class="btn-secondary load-more-btn" style="width: 100%; margin-top: 12px; font-size: 12px; padding: 8px; justify-content: center;">Load More (${filtered.length - limit} left)</button>`;
+      }
+      
+      listEl.innerHTML = html;
     }
 
     if (countEl) {
@@ -267,6 +355,7 @@
   function renderMainContent() {
     const editorView = $('#editorView');
     const calendarView = $('#calendarView');
+    const statsView = $('#statsView');
     const emptyState = $('#emptyState');
     const deleteBtn = $('#deleteScriptBtn');
     const printBtn = $('#printScriptBtn');
@@ -280,6 +369,9 @@
     // Hide all views
     editorView.classList.remove('active');
     calendarView.classList.remove('active');
+    if (statsView) statsView.classList.remove('active');
+    const driveView = $('#driveView');
+    if (driveView) driveView.classList.remove('active');
     emptyState.classList.remove('active');
 
     if (state.currentView === 'calendar') {
@@ -288,6 +380,25 @@
       if (printBtn) printBtn.style.display = 'none';
       if (tpBtn) tpBtn.style.display = 'none';
       renderCalendar();
+      return;
+    }
+
+    if (state.currentView === 'stats') {
+      if (statsView) statsView.classList.add('active');
+      if (deleteBtn) deleteBtn.style.display = 'none';
+      if (printBtn) printBtn.style.display = 'none';
+      if (tpBtn) tpBtn.style.display = 'none';
+      renderStatsDashboard();
+      return;
+    }
+
+    if (state.currentView === 'drive') {
+      const driveView = $('#driveView');
+      if (driveView) driveView.classList.add('active');
+      if (deleteBtn) deleteBtn.style.display = 'none';
+      if (printBtn) printBtn.style.display = 'none';
+      if (tpBtn) tpBtn.style.display = 'none';
+      renderDriveDashboard();
       return;
     }
 
@@ -308,6 +419,23 @@
     renderEditor(script);
   }
 
+  function updateEditorStats() {
+    const editor = $('#editor');
+    const wordCountEl = $('#wordCount');
+    const readingTimeEl = $('#readingTime');
+    if (!editor || !wordCountEl || !readingTimeEl) return;
+
+    const text = editor.innerText || editor.textContent || '';
+    const words = text.trim().split(/\s+/).filter(word => word.length > 0);
+    const count = words.length;
+    wordCountEl.textContent = `${count} word${count !== 1 ? 's' : ''}`;
+
+    // Average reading speed is ~150 words per minute for teleprompter/video scripts
+    const minutes = count / 150;
+    const readingTime = Math.ceil(minutes);
+    readingTimeEl.textContent = `~${readingTime} min read`;
+  }
+
   function renderEditor(script) {
     const titleInput = $('#scriptTitle');
     const editor = $('#editor');
@@ -324,6 +452,9 @@
       editor.innerHTML = script.content || '';
       editor.style.fontSize = `${state.editorFontSize}px`;
       updatePartsSidebar();
+      if (typeof updateEditorStats === 'function') {
+        updateEditorStats();
+      }
     }
 
     const fontSizeSlider = $('#fontSizeSlider');
@@ -645,17 +776,103 @@
       tpScriptNames = ['Script'];
     }
 
+    function sanitizeTpHtml(html) {
+      if (!html) return html;
+      // Create a temporary element to parse and clean HTML
+      const temp = document.createElement('div');
+      temp.innerHTML = html;
+      // Remove all style and class attributes, keep structure
+      temp.querySelectorAll('*').forEach(el => {
+        el.removeAttribute('style');
+        el.removeAttribute('class');
+        // Remove data attributes except data-part-name
+        Array.from(el.attributes).forEach(attr => {
+          if (attr.name.startsWith('data-') && attr.name !== 'data-part-name') {
+            el.removeAttribute(attr.name);
+          }
+        });
+      });
+      return temp.innerHTML;
+    }
+
+    function highlightMarkers(html) {
+      if (!html) return html;
+      // Only match markers like [HOOK], [CTA], [B-ROLL] etc — not CSS selectors like [&_b]
+      return html.replace(/\[([A-Z][A-Z0-9 _\-]*)\]/g, '<span class="tp-marker">[$1]</span>');
+    }
+
     if (tpScriptParts.length > 1) {
-      if (tpPartGroup) tpPartGroup.style.display = 'flex';
+      if (tpPartGroup) tpPartGroup.style.display = 'block';
       if (tpPartSelect) {
         tpPartSelect.innerHTML = tpScriptNames.map((name, i) => `<option value="${i}">${name}</option>`).join('');
         tpPartSelect.value = "0";
       }
-      tpContent.innerHTML = tpScriptParts[0];
+      tpContent.innerHTML = highlightMarkers(sanitizeTpHtml(tpScriptParts[0]));
     } else {
       if (tpPartGroup) tpPartGroup.style.display = 'none';
-      tpContent.innerHTML = tpScriptParts[0];
+      tpContent.innerHTML = highlightMarkers(sanitizeTpHtml(tpScriptParts[0]));
     }
+    
+    // Initialize Toggle State
+    const tpBluetoothToggle = $('#tpBluetoothToggle');
+    if (tpBluetoothToggle) {
+      tpBluetoothToggle.checked = !!state.tpBluetoothMode;
+    }
+
+    // Build Chapters Sidebar
+    const sidebar = $('#tpChaptersSidebar');
+    if (sidebar && tpContent) {
+      const markers = tpContent.querySelectorAll('.tp-marker');
+      if (markers.length > 0) {
+        sidebar.hidden = false;
+        sidebar.innerHTML = '';
+        markers.forEach((marker, i) => {
+          if (!marker.id) marker.id = `tp-marker-${i}`;
+          const btn = document.createElement('button');
+          btn.className = 'tp-chapter-btn';
+          btn.textContent = marker.textContent.replace(/[\[\]]/g, '');
+          btn.onclick = () => {
+            const scrollArea = $('#tpScrollArea');
+            const offset = Math.max(0, marker.offsetTop - (scrollArea.clientHeight / 3));
+            if (state.tpIsPlaying) toggleTeleprompterPlay();
+            scrollArea.scrollTop = offset;
+            tpExactScrollTop = offset;
+            tpLastIntScroll = offset;
+          };
+          sidebar.appendChild(btn);
+        });
+      } else {
+        sidebar.hidden = true;
+      }
+    }
+
+    // Reset Timer
+    tpElapsedTimeMs = 0;
+    const elTimeEl = $('#tpElapsedTime');
+    if (elTimeEl) elTimeEl.textContent = '00:00';
+
+    // Sync HUD state
+    const eyelineToggle = $('#tpEyelineToggle');
+    if (eyelineToggle) eyelineToggle.checked = !!state.tpEyeline;
+    const eyelineOverlay = $('#tpEyelineOverlay');
+    if (eyelineOverlay) eyelineOverlay.hidden = !state.tpEyeline;
+    
+    const fwSelect = $('#tpFontWeightSelect');
+    if (fwSelect && state.tpFontWeight) fwSelect.value = state.tpFontWeight;
+
+    const themeBtns = document.querySelectorAll('.theme-btn');
+    themeBtns.forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.theme === (state.tpTheme || 'default'));
+    });
+
+    // Migrate old fractional speed to new slider range (10-250)
+    if (state.tpSpeed < 10) {
+      state.tpSpeed = Math.round((parseFloat(state.tpSpeed) || 0.5) * 140);
+      save();
+    }
+    
+    const speedSlider = $('#tpSpeedSlider');
+    if (speedSlider) speedSlider.value = state.tpSpeed;
     
     // Apply initial settings
     updateTeleprompterStyles();
@@ -697,10 +914,22 @@
   }
 
   function updateTpPlayButton() {
-    const btn = $('#tpPlayPauseBtn');
-    if (btn) {
-      btn.textContent = state.tpIsPlaying ? '⏸ Pause (Space)' : '▶ Play (Space)';
+    const playIcon = document.querySelector('#tpPlayPauseBtn .play-icon');
+    const pauseIcon = document.querySelector('#tpPlayPauseBtn .pause-icon');
+    if (playIcon && pauseIcon) {
+      playIcon.style.display = state.tpIsPlaying ? 'none' : 'block';
+      pauseIcon.style.display = state.tpIsPlaying ? 'block' : 'none';
     }
+  }
+
+  let tpLastIntScroll = -1;
+  let tpElapsedTimeMs = 0;
+
+  function formatTpTime(totalSeconds) {
+    if (!isFinite(totalSeconds) || totalSeconds < 0) return "--:--";
+    const m = Math.floor(totalSeconds / 60);
+    const s = Math.floor(totalSeconds % 60);
+    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   }
 
   function tpAnimationLoop(timestamp) {
@@ -713,31 +942,69 @@
     }
     
     const scrollArea = $('#tpScrollArea');
+
+    // Sync manual scroll: if the user scrolled manually, update our exact tracker
+    if (tpLastIntScroll !== -1 && Math.abs(scrollArea.scrollTop - tpLastIntScroll) > 2) {
+      tpExactScrollTop = scrollArea.scrollTop;
+    }
+
     const deltaMs = timestamp - tpLastTimestamp;
     tpLastTimestamp = timestamp;
     const deltaTime = Math.min(deltaMs / 1000, 0.1);
     
-    // Speed: 0.2x-1x → 1x = 150px/s
-    const pixelsPerSecond = parseFloat(state.tpSpeed) * 150;
+    tpElapsedTimeMs += deltaMs;
+    const elTimeEl = $('#tpElapsedTime');
+    if (elTimeEl) elTimeEl.textContent = formatTpTime(tpElapsedTimeMs / 1000);
+
+    // Speed directly from slider (10-250 pixels per second)
+    const pixelsPerSecond = parseFloat(state.tpSpeed) || 70;
     const scrollDelta = pixelsPerSecond * deltaTime;
+    const content = $('#tpContent');
+
+    // Update ETA
+    const maxScrollForEta = Math.max(0, scrollArea.scrollHeight - scrollArea.clientHeight);
+    const remainingPixels = state.tpFlipped ? tpExactScrollTop : Math.max(0, maxScrollForEta - tpExactScrollTop);
+    const etaSeconds = pixelsPerSecond > 0 ? remainingPixels / pixelsPerSecond : 0;
+    const etaTimeEl = $('#tpEtaTime');
+    if (etaTimeEl) etaTimeEl.textContent = formatTpTime(etaSeconds);
 
     if (state.tpFlipped) {
       // Flipped: text beginning is at bottom, scroll upward
       tpExactScrollTop -= scrollDelta;
       if (tpExactScrollTop < 0) tpExactScrollTop = 0;
-      scrollArea.scrollTop = Math.round(tpExactScrollTop);
+      
+      const intScroll = Math.ceil(tpExactScrollTop);
+      const fracScroll = intScroll - tpExactScrollTop;
+      scrollArea.scrollTop = intScroll;
+      tpLastIntScroll = scrollArea.scrollTop;
+
+      if (content) content.style.transform = (state.tpBaseTransform ? state.tpBaseTransform + ' ' : '') + `translateY(${fracScroll}px)`;
+
       if (scrollArea.scrollTop <= 0) {
         state.tpIsPlaying = false;
+        if (content) content.style.transform = state.tpBaseTransform || 'none';
         updateTpPlayButton();
         return;
       }
     } else {
       // Normal: scroll downward
       tpExactScrollTop += scrollDelta;
-      scrollArea.scrollTop = Math.round(tpExactScrollTop);
-      const maxScroll = scrollArea.scrollHeight - scrollArea.clientHeight;
+      const maxScroll = Math.max(0, scrollArea.scrollHeight - scrollArea.clientHeight);
+      
+      if (tpExactScrollTop > maxScroll) {
+        tpExactScrollTop = maxScroll;
+      }
+
+      const intScroll = Math.floor(tpExactScrollTop);
+      const fracScroll = tpExactScrollTop - intScroll;
+      scrollArea.scrollTop = intScroll;
+      tpLastIntScroll = scrollArea.scrollTop;
+
+      if (content) content.style.transform = (state.tpBaseTransform ? state.tpBaseTransform + ' ' : '') + `translateY(-${fracScroll}px)`;
+
       if (scrollArea.scrollTop >= maxScroll - 1) {
         state.tpIsPlaying = false;
+        if (content) content.style.transform = state.tpBaseTransform || 'none';
         updateTpPlayButton();
         return;
       }
@@ -752,7 +1019,8 @@
     let transforms = [];
     if (state.tpMirrored) transforms.push('scaleX(-1)');
     if (state.tpFlipped) transforms.push('scaleY(-1)');
-    content.style.transform = transforms.length ? transforms.join(' ') : 'none';
+    state.tpBaseTransform = transforms.length ? transforms.join(' ') : '';
+    content.style.transform = state.tpBaseTransform ? state.tpBaseTransform : 'none';
     
     // Update button active states
     const mirrorBtn = $('#tpMirrorBtn');
@@ -767,6 +1035,16 @@
     tpContent.style.fontSize = `${state.tpFontSize}px`;
     tpContent.style.paddingLeft = `${state.tpMargin}vw`;
     tpContent.style.paddingRight = `${state.tpMargin}vw`;
+    tpContent.style.paddingTop = '50vh';
+    tpContent.style.paddingBottom = '50vh';
+    tpContent.style.fontWeight = state.tpFontWeight || 'bold';
+
+    const overlay = $('#teleprompterOverlay');
+    if (overlay) {
+      overlay.classList.remove('theme-high-contrast', 'theme-light');
+      if (state.tpTheme === 'high-contrast') overlay.classList.add('theme-high-contrast');
+      else if (state.tpTheme === 'light') overlay.classList.add('theme-light');
+    }
     
     const elements = tpContent.querySelectorAll('*');
     elements.forEach(el => {
@@ -836,6 +1114,7 @@
     // Search
     $('#searchInput').addEventListener('input', (e) => {
       state.searchQuery = e.target.value;
+      state.visibleScriptsCount = 20; // reset pagination on search
       renderSidebar();
     });
 
@@ -844,6 +1123,7 @@
     if (statusFilter) {
       statusFilter.addEventListener('change', (e) => {
         state.statusFilter = e.target.value;
+        state.visibleScriptsCount = 20; // reset pagination on filter change
         renderSidebar();
       });
     }
@@ -853,6 +1133,13 @@
 
     // Script list click (delegation)
     $('#scriptList').addEventListener('click', (e) => {
+      const loadMore = e.target.closest('.load-more-btn');
+      if (loadMore) {
+        state.visibleScriptsCount = (state.visibleScriptsCount || 20) + 20;
+        renderSidebar();
+        return;
+      }
+      
       const item = e.target.closest('.script-item');
       if (item) selectScript(item.dataset.id);
     });
@@ -866,10 +1153,21 @@
       });
     });
 
-    // Delete script
-    $('#deleteScriptBtn').addEventListener('click', () => {
-      if (state.activeScriptId) openModal('deleteModal');
-    });
+    const deleteBtn = $('#deleteScriptBtn');
+    if (deleteBtn) {
+      deleteBtn.addEventListener('click', () => {
+        if (state.activeScriptId) {
+          const script = getActiveScript();
+          const modalText = $('#deleteModalText');
+          if (script && modalText) {
+            modalText.textContent = script.status === 'deleted' 
+              ? 'Are you sure you want to permanently delete this script? This cannot be undone.'
+              : 'Are you sure you want to move this script to Trash?';
+          }
+          openModal('deleteModal');
+        }
+      });
+    }
 
     $('#confirmDeleteBtn').addEventListener('click', () => {
       closeModal('deleteModal');
@@ -919,7 +1217,77 @@
     $('#scriptTitle').addEventListener('input', autoSave);
 
     // Editor input
-    $('#editor').addEventListener('input', autoSave);
+    $('#editor').addEventListener('input', (e) => {
+      autoSave();
+      updateEditorStats();
+    });
+
+    // Editor Tab Key (Table extension)
+    $('#editor').addEventListener('keydown', (e) => {
+      if (e.key === 'Tab') {
+        const sel = window.getSelection();
+        if (!sel.rangeCount) return;
+        const node = sel.anchorNode;
+        const cell = node.nodeType === 3 ? node.parentNode.closest('td, th') : node.closest('td, th');
+        if (cell) {
+          const row = cell.closest('tr');
+          const table = cell.closest('table');
+          const isLastCellInRow = cell === row.lastElementChild;
+          const isLastRowInTable = row === table.lastElementChild || row === table.querySelector('tbody')?.lastElementChild;
+          
+          if (isLastCellInRow && isLastRowInTable) {
+            e.preventDefault();
+            // Automatically add a new row at the bottom
+            const clone = row.cloneNode(true);
+            Array.from(clone.children).forEach(td => td.innerHTML = '');
+            row.parentNode.appendChild(clone);
+            
+            // Move cursor to the first cell of the new row
+            const firstNewCell = clone.firstElementChild;
+            if (firstNewCell) {
+              const newRange = document.createRange();
+              newRange.selectNodeContents(firstNewCell);
+              newRange.collapse(true);
+              sel.removeAllRanges();
+              sel.addRange(newRange);
+            }
+          }
+        }
+      }
+    });
+
+    // Markdown shortcuts
+    $('#editor').addEventListener('keyup', (e) => {
+      if (e.key === ' ' || e.key === 'Enter') {
+        const selection = window.getSelection();
+        if (!selection.rangeCount) return;
+        const range = selection.getRangeAt(0);
+        const node = range.startContainer;
+        
+        if (node.nodeType === 3) { // Text node
+          const text = node.textContent;
+          const match = text.match(/^(#{1,3})\s/);
+          if (match) {
+            e.preventDefault();
+            const level = match[1].length;
+            const headingTag = 'h' + level;
+            
+            // Remove the markdown prefix
+            node.textContent = text.substring(match[0].length);
+            
+            // Apply heading format
+            document.execCommand('formatBlock', false, headingTag);
+            
+            // Move cursor to the end
+            const newRange = document.createRange();
+            newRange.selectNodeContents(node);
+            newRange.collapse(false);
+            selection.removeAllRanges();
+            selection.addRange(newRange);
+          }
+        }
+      }
+    });
 
     // Clean paste from ChatGPT or other sources
     $('#editor').addEventListener('paste', (e) => {
@@ -967,7 +1335,14 @@
     if (tpPartSelect) {
       tpPartSelect.addEventListener('change', (e) => {
         const partIndex = parseInt(e.target.value, 10);
-        $('#tpContent').innerHTML = tpScriptParts[partIndex] || '';
+        const raw = tpScriptParts[partIndex] || '';
+        // Sanitize: strip styles/classes
+        const temp = document.createElement('div');
+        temp.innerHTML = raw;
+        temp.querySelectorAll('*').forEach(el => { el.removeAttribute('style'); el.removeAttribute('class'); });
+        const clean = temp.innerHTML;
+        // Highlight markers (only uppercase like [HOOK], [CTA])
+        $('#tpContent').innerHTML = clean.replace(/\[([A-Z][A-Z0-9 _\-]*)\]/g, '<span class="tp-marker">[$1]</span>');
         updateTeleprompterStyles();
         
         // Reset scroll position for the new part
@@ -999,6 +1374,181 @@
     $('#tpFontSizeSlider').addEventListener('input', (e) => {
       state.tpFontSize = e.target.value;
       updateTeleprompterStyles();
+    });
+
+    // Teleprompter HUD Event Listeners
+    const tpSettingsDrawer = $('#tpSettingsDrawer');
+    const tpSettingsToggleBtn = $('#tpSettingsToggleBtn');
+    const tpSettingsCloseBtn = $('#tpSettingsCloseBtn');
+    if (tpSettingsDrawer && tpSettingsToggleBtn) {
+      tpSettingsToggleBtn.addEventListener('click', () => tpSettingsDrawer.classList.toggle('open'));
+      if (tpSettingsCloseBtn) tpSettingsCloseBtn.addEventListener('click', () => tpSettingsDrawer.classList.remove('open'));
+    }
+
+    const themeBtns = document.querySelectorAll('.theme-btn');
+    themeBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        themeBtns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        state.tpTheme = btn.dataset.theme;
+        updateTeleprompterStyles();
+      });
+    });
+
+    const tpFontWeightSelect = $('#tpFontWeightSelect');
+    if (tpFontWeightSelect) {
+      tpFontWeightSelect.addEventListener('change', (e) => {
+        state.tpFontWeight = e.target.value;
+        updateTeleprompterStyles();
+      });
+    }
+
+    const tpEyelineToggle = $('#tpEyelineToggle');
+    if (tpEyelineToggle) {
+      tpEyelineToggle.addEventListener('change', (e) => {
+        state.tpEyeline = e.target.checked;
+        const eyelineOverlay = $('#tpEyelineOverlay');
+        if (eyelineOverlay) eyelineOverlay.hidden = !state.tpEyeline;
+      });
+    }
+
+    // Custom Shortcuts Configuration Logic
+    let activeShortcutBtn = null;
+    let activeShortcutAction = null;
+    const shortcutBtns = document.querySelectorAll('.shortcut-btn');
+    
+    function updateShortcutUI() {
+      if (!state.tpShortcuts) return;
+      document.querySelectorAll('.shortcut-btn').forEach(btn => {
+        const action = btn.dataset.action;
+        if (state.tpShortcuts[action]) {
+          btn.textContent = state.tpShortcuts[action];
+        }
+      });
+    }
+    // Call it initially when teleprompter opens, or just let it update on load.
+    // We will call updateShortcutUI inside openTeleprompter or here on load.
+    setTimeout(updateShortcutUI, 100);
+
+    shortcutBtns.forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        // Cancel previous if any
+        if (activeShortcutBtn) {
+          activeShortcutBtn.classList.remove('listening');
+          activeShortcutBtn.textContent = state.tpShortcuts[activeShortcutAction] || 'Click to set';
+        }
+        
+        activeShortcutBtn = btn;
+        activeShortcutAction = btn.dataset.action;
+        btn.classList.add('listening');
+        btn.textContent = 'Listening...';
+        e.stopPropagation();
+      });
+    });
+
+    const tpBluetoothToggle = $('#tpBluetoothToggle');
+    if (tpBluetoothToggle) {
+      tpBluetoothToggle.addEventListener('change', (e) => {
+        state.tpBluetoothMode = e.target.checked;
+        save();
+      });
+    }
+
+    // Keyboard Shortcuts for Teleprompter (including capturing config)
+    window.addEventListener('keydown', (e) => {
+      // 1. Focus interception - if Teleprompter is open, prevent default behavior of spacebar/arrows 
+      //    even if some button or select is accidentally focused, unless it's explicitly a text input.
+      const tpOverlay = $('#teleprompterOverlay');
+      if (tpOverlay && !tpOverlay.hidden) {
+        const tag = e.target.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+
+        // If we are configuring a shortcut
+        if (activeShortcutBtn && activeShortcutAction) {
+          e.preventDefault();
+          e.stopPropagation();
+          const code = e.code;
+          state.tpShortcuts[activeShortcutAction] = code;
+          save();
+          activeShortcutBtn.textContent = code;
+          activeShortcutBtn.classList.remove('listening');
+          activeShortcutBtn = null;
+          activeShortcutAction = null;
+          return;
+        }
+
+        // 2. Determine which keys to listen to
+        let playKey = 'Space';
+        let upKey = 'ArrowUp';
+        let downKey = 'ArrowDown';
+        let scrollUpKey = 'PageUp';
+        let scrollDownKey = 'PageDown';
+        let exitKey = 'Escape';
+
+        if (state.tpBluetoothMode && state.tpShortcuts) {
+          playKey = state.tpShortcuts.playPause || playKey;
+          upKey = state.tpShortcuts.speedUp || upKey;
+          downKey = state.tpShortcuts.speedDown || downKey;
+          scrollUpKey = state.tpShortcuts.scrollUp || scrollUpKey;
+          scrollDownKey = state.tpShortcuts.scrollDown || scrollDownKey;
+          exitKey = state.tpShortcuts.exit || exitKey;
+        }
+
+        // 3. Process the shortcut
+        if (e.code === playKey) {
+          e.preventDefault();
+          e.stopPropagation();
+          toggleTeleprompterPlay();
+        } else if (e.code === exitKey) {
+          e.preventDefault();
+          e.stopPropagation();
+          closeTeleprompter();
+        } else if (e.code === upKey) {
+          // SPEED UP (Increase speed value)
+          e.preventDefault();
+          e.stopPropagation();
+          let currentSpeed = parseFloat(state.tpSpeed) || 70;
+          currentSpeed = Math.min(250, currentSpeed + 10);
+          state.tpSpeed = currentSpeed;
+          const speedSlider = $('#tpSpeedSlider');
+          if (speedSlider) speedSlider.value = currentSpeed;
+        } else if (e.code === downKey) {
+          // SPEED DOWN (Decrease speed value)
+          e.preventDefault();
+          e.stopPropagation();
+          let currentSpeed = parseFloat(state.tpSpeed) || 70;
+          currentSpeed = Math.max(10, currentSpeed - 10);
+          state.tpSpeed = currentSpeed;
+          const speedSlider = $('#tpSpeedSlider');
+          if (speedSlider) speedSlider.value = currentSpeed;
+        } else if (e.code === scrollUpKey) {
+          e.preventDefault();
+          e.stopPropagation();
+          const tpScrollArea = $('#tpScrollArea');
+          if (tpScrollArea) {
+            tpScrollArea.scrollTop = Math.max(0, tpScrollArea.scrollTop - 200);
+            tpExactScrollTop = tpScrollArea.scrollTop;
+          }
+        } else if (e.code === scrollDownKey) {
+          e.preventDefault();
+          e.stopPropagation();
+          const tpScrollArea = $('#tpScrollArea');
+          if (tpScrollArea) {
+            tpScrollArea.scrollTop = Math.min(tpScrollArea.scrollHeight, tpScrollArea.scrollTop + 200);
+            tpExactScrollTop = tpScrollArea.scrollTop;
+          }
+        }
+      }
+    }, true); // Use capture phase to intercept before focused elements swallow it
+
+    // Handle clicks outside to cancel listening
+    window.addEventListener('click', () => {
+      if (activeShortcutBtn) {
+        activeShortcutBtn.classList.remove('listening');
+        activeShortcutBtn.textContent = state.tpShortcuts[activeShortcutAction] || 'Click to set';
+        activeShortcutBtn = null;
+        activeShortcutAction = null;
+      }
     });
 
     $('#tpMirrorBtn').addEventListener('click', () => {
@@ -1033,17 +1583,121 @@
         } else {
           execFormat(cmd, val);
         }
+        updateToolbarStates();
       });
+    });
+
+    function updateToolbarStates() {
+      $$('.toolbar-btn[data-command]').forEach((btn) => {
+        const cmd = btn.dataset.command;
+        const val = btn.dataset.value;
+        let isActive = false;
+        
+        try {
+          if (cmd === 'formatBlock') {
+            let currentBlock = document.queryCommandValue(cmd);
+            if (currentBlock) {
+               // queryCommandValue might return 'h1' or 'heading 1' or '"h1"' or '<h1>' depending on browser.
+               // It's safer to check for inclusion for headers, or direct match
+               currentBlock = currentBlock.replace(/['"<>\s]/g, '').toLowerCase();
+               if (currentBlock === val.toLowerCase()) {
+                 isActive = true;
+               }
+            }
+          } else if (['bold', 'italic', 'underline', 'strikeThrough', 'justifyLeft', 'justifyCenter', 'justifyRight', 'justifyFull', 'insertUnorderedList', 'insertOrderedList'].includes(cmd)) {
+            isActive = document.queryCommandState(cmd);
+          }
+        } catch (e) {
+          // Ignore unsupported commands
+        }
+        
+        if (isActive) {
+          btn.classList.add('active');
+        } else {
+          btn.classList.remove('active');
+        }
+      });
+    }
+
+    document.addEventListener('selectionchange', () => {
+      const editor = $('#editor');
+      if (document.activeElement === editor || editor.contains(document.activeElement)) {
+        updateToolbarStates();
+      }
     });
 
     // ── Custom Context Menu ──────────────────────────────────
     const ctxMenu = $('#editorContextMenu');
     const editorEl = $('#editor');
     let ctxSavedRange = null;
+    let ctxCurrentTableCell = null;
     const PART_COLORS = ['#6e6aff', '#ff9f43', '#2ed573', '#ff6b81', '#1e90ff'];
 
     function hideContextMenu() {
       if (ctxMenu) ctxMenu.hidden = true;
+    }
+
+    function insertTableRow(cell, position) {
+      const tr = cell.closest('tr');
+      if (!tr) return;
+      const clone = tr.cloneNode(true);
+      // clear contents of clone
+      Array.from(clone.children).forEach(td => td.innerHTML = '');
+      if (position === 'above') {
+        tr.parentNode.insertBefore(clone, tr);
+      } else {
+        tr.parentNode.insertBefore(clone, tr.nextSibling);
+      }
+    }
+
+    function insertTableColumn(cell, position) {
+      const tr = cell.closest('tr');
+      const table = cell.closest('table');
+      if (!tr || !table) return;
+      const colIndex = Array.from(tr.children).indexOf(cell);
+      
+      const rows = table.querySelectorAll('tr');
+      rows.forEach(row => {
+        const targetCell = row.children[colIndex];
+        if (targetCell) {
+          const clone = targetCell.cloneNode(false);
+          clone.innerHTML = '';
+          if (position === 'left') {
+            row.insertBefore(clone, targetCell);
+          } else {
+            row.insertBefore(clone, targetCell.nextSibling);
+          }
+        }
+      });
+    }
+
+    function deleteTableRow(cell) {
+      const tr = cell.closest('tr');
+      const table = cell.closest('table');
+      if (!tr || !table) return;
+      if (table.querySelectorAll('tr').length <= 1) {
+        table.remove(); // Delete whole table if it's the last row
+      } else {
+        tr.remove();
+      }
+    }
+
+    function deleteTableColumn(cell) {
+      const tr = cell.closest('tr');
+      const table = cell.closest('table');
+      if (!tr || !table) return;
+      const colIndex = Array.from(tr.children).indexOf(cell);
+      
+      const rows = table.querySelectorAll('tr');
+      if (tr.children.length <= 1) {
+        table.remove(); // Delete whole table if it's the last column
+      } else {
+        rows.forEach(row => {
+          if (row.children[colIndex]) {
+            row.children[colIndex].remove();
+          }
+        });
+      }
     }
 
     if (editorEl && ctxMenu) {
@@ -1056,6 +1710,12 @@
         } else {
           ctxSavedRange = null;
         }
+
+        ctxCurrentTableCell = e.target.closest('td, th');
+        const tableControls = ctxMenu.querySelectorAll('.table-control');
+        tableControls.forEach(ctrl => {
+          ctrl.style.display = ctxCurrentTableCell ? 'block' : 'none';
+        });
 
         ctxMenu.hidden = false;
         // Position the menu
@@ -1109,6 +1769,24 @@
               break;
             case 'make-part':
               createPartFromSelection();
+              break;
+            case 'insert-row-above':
+              if (ctxCurrentTableCell) insertTableRow(ctxCurrentTableCell, 'above');
+              break;
+            case 'insert-row-below':
+              if (ctxCurrentTableCell) insertTableRow(ctxCurrentTableCell, 'below');
+              break;
+            case 'insert-col-left':
+              if (ctxCurrentTableCell) insertTableColumn(ctxCurrentTableCell, 'left');
+              break;
+            case 'insert-col-right':
+              if (ctxCurrentTableCell) insertTableColumn(ctxCurrentTableCell, 'right');
+              break;
+            case 'delete-row':
+              if (ctxCurrentTableCell) deleteTableRow(ctxCurrentTableCell);
+              break;
+            case 'delete-col':
+              if (ctxCurrentTableCell) deleteTableColumn(ctxCurrentTableCell);
               break;
           }
 
@@ -1301,17 +1979,8 @@
       // Click on a day cell — set active script's publish date
       const day = e.target.closest('.calendar-day:not(.other-month)');
       if (day && day.dataset.date) {
-        const script = getActiveScript();
-        if (script) {
-          script.publishDate = day.dataset.date;
-          script.updatedAt = new Date().toISOString();
-          save();
-          renderCalendar();
-          renderSidebar();
-          showToast(`"${script.title || 'Untitled'}" scheduled for ${formatDate(day.dataset.date)}`, 'success');
-        } else {
-          showToast('Select a script first to assign a date', 'info');
-        }
+        // Disabled auto-assignment of active script on calendar click to prevent accidental changes.
+        // Users can set the date explicitly from the editor view.
       }
     });
 
@@ -1357,15 +2026,17 @@
 
     // Keyboard shortcuts
     document.addEventListener('keydown', (e) => {
+      const key = e.key ? e.key.toLowerCase() : '';
+      
       // Ctrl+S — save (prevent default browser save)
-      if (e.ctrlKey && e.key === 's') {
+      if (e.ctrlKey && key === 's') {
         e.preventDefault();
         saveCurrentEditorContent();
         showToast('Saved', 'success');
       }
 
       // Ctrl+P — Print
-      if (e.ctrlKey && e.key === 'p') {
+      if (e.ctrlKey && key === 'p') {
         e.preventDefault();
         if (state.currentView === 'editor') {
           openPrintPreview();
@@ -1373,13 +2044,13 @@
       }
 
       // Ctrl+F — Find
-      if (e.ctrlKey && e.key === 'f') {
+      if (e.ctrlKey && key === 'f') {
         e.preventDefault();
         openFindReplace(false);
       }
 
       // Ctrl+H — Find & Replace
-      if (e.ctrlKey && e.key === 'h') {
+      if (e.ctrlKey && key === 'h') {
         e.preventDefault();
         openFindReplace(true);
       }
@@ -1481,18 +2152,22 @@
       sel.addRange(range);
 
       let count = 0;
-      let attempts = 0;
-      while (attempts < 5000) {
-        let found = window.find(q, false, false, false, false, false, false);
-        if (!found) break;
-        
-        // Only replace if the matched text is inside the editor
-        if ($('#editor').contains(window.getSelection().anchorNode)) {
-          document.execCommand('insertText', false, r);
-          count++;
+      
+      // A safer approach to replace all text nodes within #editor
+      function replaceTextInNodes(node) {
+        if (node.nodeType === 3) {
+          const regex = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+          if (regex.test(node.nodeValue)) {
+            const matches = node.nodeValue.match(regex);
+            if (matches) count += matches.length;
+            node.nodeValue = node.nodeValue.replace(regex, r);
+          }
+        } else if (node.nodeType === 1 && node.nodeName !== 'SCRIPT' && node.nodeName !== 'STYLE') {
+          Array.from(node.childNodes).forEach(replaceTextInNodes);
         }
-        attempts++;
       }
+      
+      replaceTextInNodes($('#editor'));
       
       showToast(`Replaced ${count} occurrences`, 'success');
       updateFindMatchCount();
@@ -1501,29 +2176,36 @@
 
   // ── Find & Replace Logic ──────────────────────────────────
   function openFindReplace(showReplace) {
-    if (state.currentView !== 'editor') return;
-    
-    const panel = $('#findReplacePanel');
-    const replaceGroup = $('#replaceGroup');
-    const title = $('#findReplaceTitle');
-    
-    panel.hidden = false;
-    if (showReplace) {
-      replaceGroup.style.display = 'flex';
-      $('#replaceBtn').style.display = 'block';
-      $('#replaceAllBtn').style.display = 'block';
-      title.textContent = 'Find & Replace';
-    } else {
-      replaceGroup.style.display = 'none';
-      $('#replaceBtn').style.display = 'none';
-      $('#replaceAllBtn').style.display = 'none';
-      title.textContent = 'Find';
+    if (state.currentView !== 'editor') {
+      showToast('Can only search in editor view', 'error');
+      return;
     }
     
-    const findInput = $('#findInput');
-    findInput.focus();
-    findInput.select();
-    updateFindMatchCount();
+    try {
+      const panel = $('#findReplacePanel');
+      const replaceGroup = $('#replaceGroup');
+      const title = $('#findReplaceTitle');
+      
+      panel.hidden = false;
+      if (showReplace) {
+        replaceGroup.style.display = 'flex';
+        $('#replaceBtn').style.display = 'block';
+        $('#replaceAllBtn').style.display = 'block';
+        title.textContent = 'Find & Replace';
+      } else {
+        replaceGroup.style.display = 'none';
+        $('#replaceBtn').style.display = 'none';
+        $('#replaceAllBtn').style.display = 'none';
+        title.textContent = 'Find';
+      }
+      
+      const findInput = $('#findInput');
+      findInput.focus();
+      findInput.select();
+      updateFindMatchCount();
+    } catch (err) {
+      showToast('Error opening Find: ' + err.message, 'error');
+    }
   }
 
   function doFind(backwards) {
@@ -1534,7 +2216,9 @@
     
     let found = false;
     let attempts = 0;
-    const maxAttempts = 1000;
+    const maxAttempts = 100; // Reduced to 100 to prevent long freezes
+    let lastAnchorNode = null;
+    let lastAnchorOffset = null;
 
     while (attempts < maxAttempts) {
       found = window.find(q, false, backwards, true, false, false, false);
@@ -1550,7 +2234,26 @@
       
       if (!found) break;
 
-      if ($('#editor').contains(window.getSelection().anchorNode)) {
+      const sel = window.getSelection();
+      
+      // If we found the exact same match again (wrap around loop), break out
+      if (sel.anchorNode === lastAnchorNode && sel.anchorOffset === lastAnchorOffset) {
+        break;
+      }
+      lastAnchorNode = sel.anchorNode;
+      lastAnchorOffset = sel.anchorOffset;
+
+      if ($('#editor').contains(sel.anchorNode)) {
+        // Scroll to the matched text
+        if (sel.rangeCount > 0) {
+          let node = sel.anchorNode;
+          if (node.nodeType === 3) { // Text node
+            node = node.parentNode;
+          }
+          if (node && typeof node.scrollIntoView === 'function') {
+            node.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }
         break; // Match is valid
       }
       attempts++;
@@ -1569,11 +2272,35 @@
       countEl.textContent = '0/0';
       return;
     }
-    const text = $('#editor').innerText || '';
+    const editor = $('#editor');
+    const text = editor.innerText || '';
     // Escape regex
     const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const matches = text.match(new RegExp(escaped, 'gi'));
-    countEl.textContent = matches ? `?/${matches.length}` : '0/0';
+    
+    if (!matches) {
+      countEl.textContent = '0/0';
+      return;
+    }
+
+    let currentIndex = '?';
+    const sel = window.getSelection();
+    if (sel.rangeCount > 0 && editor.contains(sel.anchorNode)) {
+      const range = sel.getRangeAt(0);
+      const preRange = document.createRange();
+      preRange.selectNodeContents(editor);
+      try {
+        preRange.setEnd(range.startContainer, range.startOffset);
+        const preText = preRange.toString();
+        const preMatches = preText.match(new RegExp(escaped, 'gi'));
+        currentIndex = (preMatches ? preMatches.length : 0) + 1;
+        if (currentIndex > matches.length) currentIndex = matches.length;
+      } catch (e) {
+        // Ignore selection errors
+      }
+    }
+
+    countEl.textContent = `${currentIndex}/${matches.length}`;
   }
 
   // ── Initialization ─────────────────────────────────────────
@@ -1594,6 +2321,22 @@
     render();
     setupEventListeners();
     applyTheme();
+
+    // Background sync translations for old scripts
+    setTimeout(async () => {
+      let changed = false;
+      for (let s of state.scripts) {
+        if (s.title && (!s.titleEn || s.titleEn === '')) {
+          const enText = await translateToEnglish(s.title);
+          if (enText && enText.toLowerCase() !== s.title.toLowerCase()) {
+            s.titleEn = enText;
+            changed = true;
+          }
+          await new Promise(r => setTimeout(r, 600)); // Delay to prevent rate limits
+        }
+      }
+      if (changed) save();
+    }, 2000);
 
     // Ensure teleprompter overlay is hidden on app start
     const tpOverlay = $('#teleprompterOverlay');
@@ -1834,8 +2577,797 @@
     });
   }
 
+  function setupToolsSidebar() {
+    const tabBtns = document.querySelectorAll('.tools-tab-btn');
+    const panels = document.querySelectorAll('.tools-panel');
+
+    // Tab Switching
+    tabBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const target = btn.dataset.tab;
+        
+        tabBtns.forEach(b => b.classList.remove('active'));
+        panels.forEach(p => p.classList.remove('active'));
+        
+        btn.classList.add('active');
+        document.getElementById('tab-' + target).classList.add('active');
+      });
+    });
+
+    // Block Insertion
+    const insertBtns = document.querySelectorAll('.insert-block-btn');
+    const editor = document.getElementById('editor');
+
+    insertBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const blockType = btn.dataset.block;
+        editor.focus();
+
+        if (blockType === 'text') {
+          document.execCommand('insertHTML', false, '<p><br></p>');
+        } 
+        else if (blockType === 'code') {
+          const codeHTML = `<pre style="background: rgba(0,0,0,0.3); padding: 12px; border-radius: 6px; font-family: monospace; border: 1px solid var(--border);"><code>// Code here...</code></pre><p><br></p>`;
+          document.execCommand('insertHTML', false, codeHTML);
+        }
+        else if (blockType === 'table') {
+          const tableHTML = `
+            <table style="width: 100%; border-collapse: collapse; margin: 16px 0;">
+              <tr><th style="border: 1px solid var(--border); padding: 8px; background: rgba(255,255,255,0.05);">Header 1</th><th style="border: 1px solid var(--border); padding: 8px; background: rgba(255,255,255,0.05);">Header 2</th></tr>
+              <tr><td style="border: 1px solid var(--border); padding: 8px;">Data</td><td style="border: 1px solid var(--border); padding: 8px;">Data</td></tr>
+              <tr><td style="border: 1px solid var(--border); padding: 8px;">Data</td><td style="border: 1px solid var(--border); padding: 8px;">Data</td></tr>
+            </table><p><br></p>`;
+          document.execCommand('insertHTML', false, tableHTML);
+        }
+        else if (blockType === 'line') {
+          document.execCommand('insertHTML', false, '<hr style="border: 0; border-top: 1px solid var(--border); margin: 24px 0;"><p><br></p>');
+        }
+        else if (blockType === 'broll') {
+          const brollHTML = `<span contenteditable="false" style="display: inline-flex; align-items: center; background: rgba(110, 106, 255, 0.15); color: #8e8aff; border: 1px solid rgba(110, 106, 255, 0.3); border-radius: 4px; padding: 2px 8px; font-size: 13px; font-weight: 600; font-family: monospace; user-select: all;">🎥 B-ROLL</span>&nbsp;`;
+          document.execCommand('insertHTML', false, brollHTML);
+        }
+        else if (blockType === 'image') {
+          document.getElementById('insertImageInput').click();
+        }
+      });
+    });
+
+    // Image Input Handle
+    const imageInput = document.getElementById('insertImageInput');
+    if (imageInput) {
+      imageInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) {
+          const url = URL.createObjectURL(file);
+          editor.focus();
+          document.execCommand('insertHTML', false, `<img src="${url}" style="max-width: 100%; border-radius: 8px; margin: 16px 0;"><p><br></p>`);
+          // clear input
+          imageInput.value = '';
+        }
+      });
+    }
+  }
+
+  // ── Statistics Dashboard ─────────────────────────────────────
+  function renderStatsDashboard() {
+    const scripts = state.scripts;
+    const finished = scripts.filter(s => (s.status || 'pending') === 'finished');
+    const pending = scripts.filter(s => (s.status || 'pending') === 'pending');
+    const rejected = scripts.filter(s => (s.status || 'pending') === 'rejected');
+    const trashed = scripts.filter(s => (s.status || 'pending') === 'deleted');
+
+    // KPI Cards
+    const el = (id) => document.getElementById(id);
+    el('statsTotalScripts').textContent = scripts.length;
+    el('statsFinished').textContent = finished.length;
+    el('statsPending').textContent = pending.length;
+    el('statsRejected').textContent = rejected.length;
+    el('statsTrashed').textContent = trashed.length;
+
+    // Draw charts
+    drawMonthlyChart(scripts);
+    drawDonutChart(finished.length, pending.length, rejected.length, trashed.length);
+    drawWeeklyChart(finished);
+
+    // Fill dropdown tables
+    fillDateTable(scripts);
+    fillMonthlyTable(scripts);
+    fillLengthAnalysis(scripts);
+    fillRejectionReport(rejected);
+    fillConsistencyInfo(finished);
+    fillStatusSummary(scripts);
+  }
+
+  function getScriptWordCount(s) {
+    const text = (s.content || '').replace(/<[^>]*>?/gm, ' ').replace(/\s+/g, ' ').trim();
+    return text ? text.split(/\s+/).length : 0;
+  }
+
+  function getScriptDate(s) {
+    // Use publishDate if set, else use createdAt
+    if (s.publishDate) return new Date(s.publishDate);
+    if (s.createdAt) return new Date(s.createdAt);
+    if (s.id) return new Date(parseInt(s.id)); // id is timestamp-based
+    return new Date();
+  }
+
+  // ── Monthly Bar Chart (Canvas) ──────────────────────────────
+  function drawMonthlyChart(scripts) {
+    const canvas = document.getElementById('statsMonthlyChart');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = canvas.offsetWidth * dpr;
+    canvas.height = 260 * dpr;
+    ctx.scale(dpr, dpr);
+    const W = canvas.offsetWidth;
+    const H = 260;
+    ctx.clearRect(0, 0, W, H);
+
+    // Aggregate by month (last 12 months)
+    const now = new Date();
+    const months = [];
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      months.push({ label: d.toLocaleString('default', { month: 'short', year: '2-digit' }), year: d.getFullYear(), month: d.getMonth(), total: 0, finished: 0 });
+    }
+
+    scripts.forEach(s => {
+      const d = getScriptDate(s);
+      const m = months.find(m => m.year === d.getFullYear() && m.month === d.getMonth());
+      if (m) {
+        m.total++;
+        if ((s.status || 'pending') === 'finished') m.finished++;
+      }
+    });
+
+    const maxVal = Math.max(1, ...months.map(m => m.total));
+    const pad = { left: 40, right: 16, top: 20, bottom: 40 };
+    const barW = (W - pad.left - pad.right) / months.length;
+    const chartH = H - pad.top - pad.bottom;
+
+    // Grid lines
+    ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+    ctx.lineWidth = 1;
+    for (let i = 0; i <= 4; i++) {
+      const y = pad.top + (chartH / 4) * i;
+      ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(W - pad.right, y); ctx.stroke();
+      ctx.fillStyle = 'rgba(255,255,255,0.35)';
+      ctx.font = '10px Inter, sans-serif';
+      ctx.textAlign = 'right';
+      ctx.fillText(Math.round(maxVal - (maxVal / 4) * i), pad.left - 6, y + 4);
+    }
+
+    months.forEach((m, i) => {
+      const x = pad.left + i * barW + barW * 0.15;
+      const bw = barW * 0.4;
+
+      // Total bar
+      const totalH = (m.total / maxVal) * chartH;
+      ctx.fillStyle = 'rgba(255,255,255,0.12)';
+      ctx.beginPath();
+      ctx.roundRect(x, pad.top + chartH - totalH, bw, totalH, [3, 3, 0, 0]);
+      ctx.fill();
+
+      // Finished bar
+      const finH = (m.finished / maxVal) * chartH;
+      ctx.fillStyle = '#42a5f5';
+      ctx.beginPath();
+      ctx.roundRect(x + bw + 2, pad.top + chartH - finH, bw, finH, [3, 3, 0, 0]);
+      ctx.fill();
+
+      // Label
+      ctx.fillStyle = 'rgba(255,255,255,0.45)';
+      ctx.font = '10px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(m.label, pad.left + i * barW + barW / 2, H - pad.bottom + 16);
+    });
+
+    // Legend
+    ctx.fillStyle = 'rgba(255,255,255,0.12)';
+    ctx.fillRect(W - 150, 8, 10, 10);
+    ctx.fillStyle = '#42a5f5';
+    ctx.fillRect(W - 80, 8, 10, 10);
+    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    ctx.font = '10px Inter, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('Total', W - 136, 17);
+    ctx.fillText('Uploaded', W - 66, 17);
+  }
+
+  // ── Donut Chart (Canvas) ────────────────────────────────────
+  function drawDonutChart(finished, pending, rejected, trashed) {
+    const canvas = document.getElementById('statsDonutChart');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = canvas.offsetWidth * dpr;
+    canvas.height = 260 * dpr;
+    ctx.scale(dpr, dpr);
+    const W = canvas.offsetWidth;
+    const H = 260;
+    ctx.clearRect(0, 0, W, H);
+
+    const total = finished + pending + rejected + trashed;
+    if (total === 0) {
+      ctx.fillStyle = 'rgba(255,255,255,0.3)';
+      ctx.font = '14px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('No data', W / 2, H / 2);
+      return;
+    }
+
+    const slices = [
+      { value: finished, color: '#42a5f5', label: 'Uploaded' },
+      { value: pending, color: '#ffa726', label: 'Pending' },
+      { value: rejected, color: '#f44336', label: 'Rejected' },
+      { value: trashed, color: '#ab47bc', label: 'Trashed' },
+    ].filter(s => s.value > 0);
+
+    const cx = W / 2;
+    const cy = 110;
+    const r = 80;
+    const innerR = 50;
+    let angle = -Math.PI / 2;
+
+    slices.forEach(s => {
+      const sliceAngle = (s.value / total) * Math.PI * 2;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, angle, angle + sliceAngle);
+      ctx.arc(cx, cy, innerR, angle + sliceAngle, angle, true);
+      ctx.closePath();
+      ctx.fillStyle = s.color;
+      ctx.fill();
+      angle += sliceAngle;
+    });
+
+    // Center text
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 22px Inter, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(total, cx, cy + 2);
+    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    ctx.font = '10px Inter, sans-serif';
+    ctx.fillText('TOTAL', cx, cy + 16);
+
+    // Legend below
+    let lx = 10;
+    const ly = 210;
+    slices.forEach(s => {
+      ctx.fillStyle = s.color;
+      ctx.fillRect(lx, ly, 8, 8);
+      ctx.fillStyle = 'rgba(255,255,255,0.6)';
+      ctx.font = '11px Inter, sans-serif';
+      ctx.textAlign = 'left';
+      const pct = Math.round((s.value / total) * 100);
+      const text = `${s.label} (${s.value} — ${pct}%)`;
+      ctx.fillText(text, lx + 12, ly + 8);
+      lx += ctx.measureText(text).width + 24;
+      if (lx > W - 40) { lx = 10; }
+    });
+  }
+
+  // ── Weekly Consistency Chart ────────────────────────────────
+  function drawWeeklyChart(finishedScripts) {
+    const canvas = document.getElementById('statsWeeklyChart');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = canvas.offsetWidth * dpr;
+    canvas.height = 200 * dpr;
+    ctx.scale(dpr, dpr);
+    const W = canvas.offsetWidth;
+    const H = 200;
+    ctx.clearRect(0, 0, W, H);
+
+    // Last 12 weeks
+    const now = new Date();
+    const weeks = [];
+    for (let i = 11; i >= 0; i--) {
+      const weekStart = new Date(now);
+      weekStart.setDate(now.getDate() - (i * 7));
+      weekStart.setHours(0, 0, 0, 0);
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekStart.getDate() + 7);
+      const count = finishedScripts.filter(s => {
+        const d = getScriptDate(s);
+        return d >= weekStart && d < weekEnd;
+      }).length;
+      const label = `W${12 - i}`;
+      weeks.push({ label, count, start: weekStart });
+    }
+
+    const maxVal = Math.max(1, ...weeks.map(w => w.count));
+    const pad = { left: 36, right: 16, top: 16, bottom: 34 };
+    const chartW = W - pad.left - pad.right;
+    const chartH = H - pad.top - pad.bottom;
+    const barW = chartW / weeks.length;
+
+    // Grid
+    ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+    for (let i = 0; i <= 3; i++) {
+      const y = pad.top + (chartH / 3) * i;
+      ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(W - pad.right, y); ctx.stroke();
+      ctx.fillStyle = 'rgba(255,255,255,0.35)';
+      ctx.font = '10px Inter, sans-serif';
+      ctx.textAlign = 'right';
+      ctx.fillText(Math.round(maxVal - (maxVal / 3) * i), pad.left - 6, y + 4);
+    }
+
+    weeks.forEach((w, i) => {
+      const x = pad.left + i * barW + barW * 0.2;
+      const bw = barW * 0.6;
+      const bh = (w.count / maxVal) * chartH;
+
+      const gradient = ctx.createLinearGradient(x, pad.top + chartH - bh, x, pad.top + chartH);
+      gradient.addColorStop(0, w.count > 0 ? '#66bb6a' : 'rgba(255,255,255,0.06)');
+      gradient.addColorStop(1, w.count > 0 ? '#388e3c' : 'rgba(255,255,255,0.03)');
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.roundRect(x, pad.top + chartH - bh, bw, bh || 2, [3, 3, 0, 0]);
+      ctx.fill();
+
+      // Count on top
+      if (w.count > 0) {
+        ctx.fillStyle = '#66bb6a';
+        ctx.font = 'bold 11px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(w.count, x + bw / 2, pad.top + chartH - bh - 6);
+      }
+
+      // Label
+      ctx.fillStyle = 'rgba(255,255,255,0.4)';
+      ctx.font = '10px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(w.label, pad.left + i * barW + barW / 2, H - pad.bottom + 16);
+    });
+  }
+
+  // ── Dropdown Data Fillers ───────────────────────────────────
+  function fillDateTable(scripts) {
+    const el = document.getElementById('statsDateTable');
+    if (!el) return;
+    const sorted = [...scripts].sort((a, b) => getScriptDate(b) - getScriptDate(a));
+    if (sorted.length === 0) { el.innerHTML = '<p style="color:var(--text-muted);font-size:13px;">No scripts to show.</p>'; return; }
+    let html = `<table><thead><tr><th>#</th><th>Title</th><th>Status</th><th>Words</th><th>Date</th></tr></thead><tbody>`;
+    sorted.forEach((s, i) => {
+      const d = getScriptDate(s);
+      const status = s.status || 'pending';
+      html += `<tr>
+        <td>${i + 1}</td>
+        <td>${s.title || 'Untitled'}</td>
+        <td><span class="stats-badge stats-badge-${status}">${status}</span></td>
+        <td>${getScriptWordCount(s).toLocaleString()}</td>
+        <td>${d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
+      </tr>`;
+    });
+    html += '</tbody></table>';
+    el.innerHTML = html;
+  }
+
+  function fillMonthlyTable(scripts) {
+    const el = document.getElementById('statsMonthlyTable');
+    if (!el) return;
+    // Group by month
+    const map = {};
+    scripts.forEach(s => {
+      const d = getScriptDate(s);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      if (!map[key]) map[key] = { total: 0, finished: 0, pending: 0, rejected: 0, deleted: 0, words: 0 };
+      map[key].total++;
+      const st = s.status || 'pending';
+      if (map[key][st] !== undefined) map[key][st]++;
+      map[key].words += getScriptWordCount(s);
+    });
+    const keys = Object.keys(map).sort().reverse();
+    if (keys.length === 0) { el.innerHTML = '<p style="color:var(--text-muted);font-size:13px;">No data.</p>'; return; }
+    let html = `<table><thead><tr><th>Month</th><th>Total</th><th>Uploaded</th><th>Pending</th><th>Rejected</th><th>Trashed</th><th>Avg Words</th></tr></thead><tbody>`;
+    keys.forEach(k => {
+      const m = map[k];
+      const [y, mo] = k.split('-');
+      const label = new Date(y, mo - 1).toLocaleString('default', { month: 'long', year: 'numeric' });
+      html += `<tr>
+        <td>${label}</td>
+        <td><strong>${m.total}</strong></td>
+        <td>${m.finished}</td>
+        <td>${m.pending}</td>
+        <td>${m.rejected}</td>
+        <td>${m.deleted}</td>
+        <td>${m.total ? Math.round(m.words / m.total).toLocaleString() : '—'}</td>
+      </tr>`;
+    });
+    html += '</tbody></table>';
+    el.innerHTML = html;
+  }
+
+  function fillLengthAnalysis(scripts) {
+    const el = document.getElementById('statsLengthInfo');
+    if (!el) return;
+    const wordCounts = scripts.map(getScriptWordCount);
+    const total = wordCounts.reduce((a, b) => a + b, 0);
+    const avg = scripts.length ? Math.round(total / scripts.length) : 0;
+    const max = Math.max(0, ...wordCounts);
+    const min = scripts.length ? Math.min(...wordCounts) : 0;
+    const avgMinutes = Math.ceil(avg / 150);
+    const longestScript = scripts[wordCounts.indexOf(max)];
+    const shortestScript = scripts[wordCounts.indexOf(min)];
+
+    el.innerHTML = `
+      <div class="stats-info-item">
+        <span class="info-label">Average Script Length</span>
+        <span class="info-value">${avg.toLocaleString()}</span>
+        <span class="info-sub">words (~${avgMinutes} min video)</span>
+      </div>
+      <div class="stats-info-item">
+        <span class="info-label">Total Words Written</span>
+        <span class="info-value">${total.toLocaleString()}</span>
+        <span class="info-sub">across ${scripts.length} scripts</span>
+      </div>
+      <div class="stats-info-item">
+        <span class="info-label">Longest Script</span>
+        <span class="info-value">${max.toLocaleString()}</span>
+        <span class="info-sub">${longestScript ? (longestScript.title || 'Untitled') : '—'}</span>
+      </div>
+      <div class="stats-info-item">
+        <span class="info-label">Shortest Script</span>
+        <span class="info-value">${min.toLocaleString()}</span>
+        <span class="info-sub">${shortestScript ? (shortestScript.title || 'Untitled') : '—'}</span>
+      </div>
+      <div class="stats-info-item">
+        <span class="info-label">Total Estimated Video Time</span>
+        <span class="info-value">${Math.ceil(total / 150)} min</span>
+        <span class="info-sub">${Math.round(total / 150 / 60)} hours of content</span>
+      </div>
+      <div class="stats-info-item">
+        <span class="info-label">Avg Words Per Day</span>
+        <span class="info-value">${scripts.length > 1 ? (() => {
+          const dates = scripts.map(s => getScriptDate(s).getTime());
+          const diff = (Math.max(...dates) - Math.min(...dates)) / (1000 * 60 * 60 * 24);
+          return diff > 0 ? Math.round(total / diff) : total;
+        })() : total}</span>
+        <span class="info-sub">writing output</span>
+      </div>
+    `;
+  }
+
+  function fillRejectionReport(rejectedScripts) {
+    const el = document.getElementById('statsRejectionInfo');
+    if (!el) return;
+    if (rejectedScripts.length === 0) {
+      el.innerHTML = '<p style="color: var(--success); font-size: 13px; padding: 8px 0;">🎉 No rejected scripts! Great track record.</p>';
+      return;
+    }
+    const totalScripts = state.scripts.length;
+    const rejPct = totalScripts ? Math.round((rejectedScripts.length / totalScripts) * 100) : 0;
+
+    let html = `<div style="margin-bottom: 14px; padding: 12px; background: rgba(244,67,54,0.08); border-radius: 8px; border: 1px solid rgba(244,67,54,0.2);">
+      <strong style="color: #f44336;">${rejectedScripts.length}</strong> <span style="color: var(--text-secondary);">scripts rejected out of ${totalScripts} total (${rejPct}% rejection rate)</span>
+    </div>`;
+    html += `<table><thead><tr><th>#</th><th>Title</th><th>Words</th><th>Date</th></tr></thead><tbody>`;
+    rejectedScripts.forEach((s, i) => {
+      const d = getScriptDate(s);
+      html += `<tr>
+        <td>${i + 1}</td>
+        <td>${s.title || 'Untitled'}</td>
+        <td>${getScriptWordCount(s).toLocaleString()}</td>
+        <td>${d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
+      </tr>`;
+    });
+    html += '</tbody></table>';
+    el.innerHTML = html;
+  }
+
+  function fillConsistencyInfo(finishedScripts) {
+    const el = document.getElementById('statsConsistencyInfo');
+    if (!el) return;
+
+    // Calculate streaks and consistency
+    const now = new Date();
+    const thisWeek = finishedScripts.filter(s => {
+      const d = getScriptDate(s);
+      const diff = (now - d) / (1000 * 60 * 60 * 24);
+      return diff <= 7;
+    }).length;
+
+    const thisMonth = finishedScripts.filter(s => {
+      const d = getScriptDate(s);
+      return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+    }).length;
+
+    // Weekly average (last 12 weeks)
+    const last12Weeks = finishedScripts.filter(s => {
+      const diff = (now - getScriptDate(s)) / (1000 * 60 * 60 * 24);
+      return diff <= 84;
+    }).length;
+    const weeklyAvg = (last12Weeks / 12).toFixed(1);
+
+    // Monthly average
+    const allMonths = new Set();
+    finishedScripts.forEach(s => {
+      const d = getScriptDate(s);
+      allMonths.add(`${d.getFullYear()}-${d.getMonth()}`);
+    });
+    const monthlyAvg = allMonths.size > 0 ? (finishedScripts.length / allMonths.size).toFixed(1) : '0';
+
+    // Streak calculation (consecutive weeks with uploads)
+    let streak = 0;
+    for (let i = 0; i < 52; i++) {
+      const weekStart = new Date(now);
+      weekStart.setDate(now.getDate() - (i * 7));
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekStart.getDate() - 7);
+      const hasUpload = finishedScripts.some(s => {
+        const d = getScriptDate(s);
+        return d <= weekStart && d > weekEnd;
+      });
+      if (hasUpload) streak++;
+      else break;
+    }
+
+    // Best month
+    const monthMap = {};
+    finishedScripts.forEach(s => {
+      const d = getScriptDate(s);
+      const key = `${d.getFullYear()}-${d.getMonth()}`;
+      monthMap[key] = (monthMap[key] || 0) + 1;
+    });
+    const bestMonthKey = Object.keys(monthMap).sort((a, b) => monthMap[b] - monthMap[a])[0];
+    let bestMonthLabel = '—';
+    let bestMonthCount = 0;
+    if (bestMonthKey) {
+      const [y, m] = bestMonthKey.split('-');
+      bestMonthLabel = new Date(y, m).toLocaleString('default', { month: 'long', year: 'numeric' });
+      bestMonthCount = monthMap[bestMonthKey];
+    }
+
+    el.innerHTML = `
+      <div class="stats-info-item">
+        <span class="info-label">This Week</span>
+        <span class="info-value">${thisWeek}</span>
+        <span class="info-sub">videos uploaded</span>
+      </div>
+      <div class="stats-info-item">
+        <span class="info-label">This Month</span>
+        <span class="info-value">${thisMonth}</span>
+        <span class="info-sub">videos uploaded</span>
+      </div>
+      <div class="stats-info-item">
+        <span class="info-label">Weekly Average</span>
+        <span class="info-value">${weeklyAvg}</span>
+        <span class="info-sub">uploads / week (12w)</span>
+      </div>
+      <div class="stats-info-item">
+        <span class="info-label">Monthly Average</span>
+        <span class="info-value">${monthlyAvg}</span>
+        <span class="info-sub">uploads / month</span>
+      </div>
+      <div class="stats-info-item">
+        <span class="info-label">🔥 Current Streak</span>
+        <span class="info-value">${streak} week${streak !== 1 ? 's' : ''}</span>
+        <span class="info-sub">consecutive weeks uploading</span>
+      </div>
+      <div class="stats-info-item">
+        <span class="info-label">🏆 Best Month</span>
+        <span class="info-value">${bestMonthCount}</span>
+        <span class="info-sub">${bestMonthLabel}</span>
+      </div>
+    `;
+  }
+
+  function fillStatusSummary(scripts) {
+    const el = document.getElementById('statsStatusInfo');
+    if (!el) return;
+    const groups = {
+      finished: { label: 'Uploaded (Finished)', scripts: [], color: '#42a5f5' },
+      pending: { label: 'Pending', scripts: [], color: '#ffa726' },
+      rejected: { label: 'Rejected', scripts: [], color: '#f44336' },
+      deleted: { label: 'Trashed', scripts: [], color: '#ab47bc' },
+    };
+    scripts.forEach(s => {
+      const st = s.status || 'pending';
+      if (groups[st]) groups[st].scripts.push(s);
+    });
+
+    let html = '';
+    Object.values(groups).forEach(g => {
+      const count = g.scripts.length;
+      const pct = scripts.length ? Math.round((count / scripts.length) * 100) : 0;
+      const totalWords = g.scripts.reduce((sum, s) => sum + getScriptWordCount(s), 0);
+      const avgWords = count ? Math.round(totalWords / count) : 0;
+
+      html += `<div style="margin-bottom: 16px;">
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+          <span style="width: 10px; height: 10px; border-radius: 50%; background: ${g.color}; display: inline-block;"></span>
+          <strong style="color: var(--text-primary); font-size: 14px;">${g.label}</strong>
+          <span style="color: var(--text-muted); font-size: 12px; margin-left: auto;">${count} scripts (${pct}%)</span>
+        </div>
+        <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+          <div style="background: var(--bg-elevated); border: 1px solid var(--glass-border); border-radius: 8px; padding: 10px 14px; flex: 1; min-width: 120px;">
+            <div style="font-size: 10px; color: var(--text-muted); text-transform: uppercase;">Count</div>
+            <div style="font-size: 18px; font-weight: 700; color: var(--text-primary);">${count}</div>
+          </div>
+          <div style="background: var(--bg-elevated); border: 1px solid var(--glass-border); border-radius: 8px; padding: 10px 14px; flex: 1; min-width: 120px;">
+            <div style="font-size: 10px; color: var(--text-muted); text-transform: uppercase;">Total Words</div>
+            <div style="font-size: 18px; font-weight: 700; color: var(--text-primary);">${totalWords.toLocaleString()}</div>
+          </div>
+          <div style="background: var(--bg-elevated); border: 1px solid var(--glass-border); border-radius: 8px; padding: 10px 14px; flex: 1; min-width: 120px;">
+            <div style="font-size: 10px; color: var(--text-muted); text-transform: uppercase;">Avg Words</div>
+            <div style="font-size: 18px; font-weight: 700; color: var(--text-primary);">${avgWords.toLocaleString()}</div>
+          </div>
+          <div style="background: var(--bg-elevated); border: 1px solid var(--glass-border); border-radius: 8px; padding: 10px 14px; flex: 1; min-width: 120px;">
+            <div style="font-size: 10px; color: var(--text-muted); text-transform: uppercase;">% of Total</div>
+            <div style="font-size: 18px; font-weight: 700; color: ${g.color};">${pct}%</div>
+          </div>
+        </div>
+      </div>`;
+    });
+    el.innerHTML = html;
+  }
+
+  function setupStatsDropdowns() {
+    document.querySelectorAll('.stats-dropdown-header').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const targetId = btn.dataset.target;
+        const body = document.getElementById(targetId);
+        const dropdown = btn.closest('.stats-dropdown');
+        if (!body) return;
+        const isOpen = !body.hidden;
+        body.hidden = isOpen;
+        dropdown.classList.toggle('open', !isOpen);
+      });
+    });
+  }
+
+  // ── Mobile Remote & IPC Listeners ───────────────────────
+  $('#tpShowQRBtn')?.addEventListener('click', () => {
+    if (!serverIP || serverIP === '127.0.0.1') {
+      showToast('Connect PC to WiFi first', 'error');
+      return;
+    }
+    const url = `http://${serverIP}:3456/remote`;
+    const qrUrlText = $('#qrUrlText');
+    const qrCodeContainer = $('#qrCodeContainer');
+    
+    qrUrlText.textContent = url;
+    qrCodeContainer.innerHTML = `<img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(url)}" style="display:block; width:200px; height:200px;" alt="QR Code">`;
+    
+    $('#qrModal').hidden = false;
+  });
+
+  ipcRenderer.on('server-ip', (event, ip) => {
+    serverIP = ip;
+  });
+
+  ipcRenderer.on('tp-remote-action', (event, action) => {
+    const tpOverlay = $('#teleprompterOverlay');
+    if (!tpOverlay || tpOverlay.hidden) return; // Only process if teleprompter is open
+
+    if (action === 'playPause') {
+      toggleTeleprompterPlay();
+    } else if (action === 'exit') {
+      closeTeleprompter();
+    } else if (action === 'speedUp') {
+      let currentSpeed = parseFloat(state.tpSpeed) || 70;
+      currentSpeed = Math.min(250, currentSpeed + 10);
+      state.tpSpeed = currentSpeed;
+      const speedSlider = $('#tpSpeedSlider');
+      if (speedSlider) speedSlider.value = currentSpeed;
+    } else if (action === 'speedDown') {
+      let currentSpeed = parseFloat(state.tpSpeed) || 70;
+      currentSpeed = Math.max(10, currentSpeed - 10);
+      state.tpSpeed = currentSpeed;
+      const speedSlider = $('#tpSpeedSlider');
+      if (speedSlider) speedSlider.value = currentSpeed;
+    } else if (action === 'scrollUp') {
+      const tpScrollArea = $('#tpScrollArea');
+      if (tpScrollArea) {
+        tpScrollArea.scrollTop = Math.max(0, tpScrollArea.scrollTop - 200);
+        tpExactScrollTop = tpScrollArea.scrollTop;
+      }
+    } else if (action === 'scrollDown') {
+      const tpScrollArea = $('#tpScrollArea');
+      if (tpScrollArea) {
+        tpScrollArea.scrollTop = Math.min(tpScrollArea.scrollHeight, tpScrollArea.scrollTop + 200);
+        tpExactScrollTop = tpScrollArea.scrollTop;
+      }
+    }
+  });
+
+  // ── Drive Sync Logic ─────────────────────────────────────────
+  function renderDriveDashboard() {
+    const notConnected = $('#driveNotConnectedState');
+    const connected = $('#driveConnectedState');
+    
+    if (state.driveConnectedEmail) {
+      notConnected.style.display = 'none';
+      connected.style.display = 'block';
+      $('#driveEmailText').textContent = state.driveConnectedEmail;
+      if (state.driveLastBackup) {
+        const d = new Date(state.driveLastBackup);
+        $('#driveLastBackupText').textContent = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) + ' at ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+      } else {
+        $('#driveLastBackupText').textContent = 'Never';
+      }
+      $('#driveSyncProgressContainer').style.display = 'none';
+      $('#driveSyncNowBtn').disabled = false;
+    } else {
+      notConnected.style.display = 'block';
+      connected.style.display = 'none';
+      $('#driveConnectingLoader').style.display = 'none';
+      $('#driveConnectBtn').disabled = false;
+    }
+  }
+
+  $('#driveConnectBtn')?.addEventListener('click', async () => {
+    $('#driveConnectingLoader').style.display = 'block';
+    $('#driveConnectBtn').disabled = true;
+    try {
+      const res = await ipcRenderer.invoke('drive-connect');
+      if (res.success && res.email) {
+        state.driveConnectedEmail = res.email;
+        save();
+        renderDriveDashboard();
+        showToast('Connected to Google Drive', 'success');
+      } else if (res.pending) {
+        // Will be handled via a callback IPC if implemented, 
+        // but for mock mode it instantly returns. 
+        // For real mode, we'd need a listener: ipcRenderer.on('drive-connected', ...)
+      }
+    } catch (e) {
+      console.error(e);
+      showToast('Failed to connect', 'error');
+      $('#driveConnectingLoader').style.display = 'none';
+      $('#driveConnectBtn').disabled = false;
+    }
+  });
+
+  $('#driveDisconnectBtn')?.addEventListener('click', () => {
+    if (confirm('Are you sure you want to disconnect from Google Drive?')) {
+      state.driveConnectedEmail = null;
+      save();
+      renderDriveDashboard();
+      showToast('Disconnected from Google Drive', 'info');
+    }
+  });
+
+  $('#driveSyncNowBtn')?.addEventListener('click', async () => {
+    $('#driveSyncProgressContainer').style.display = 'block';
+    $('#driveSyncNowBtn').disabled = true;
+    $('#driveProgressBar').style.width = '0%';
+    $('#driveProgressPercent').textContent = '0%';
+    $('#driveProgressText').textContent = 'Preparing files...';
+
+    try {
+      const res = await ipcRenderer.invoke('drive-sync', state.scripts);
+      if (res.success) {
+        state.driveLastBackup = new Date().toISOString();
+        save();
+        showToast('Backup completed successfully!', 'success');
+        setTimeout(() => {
+          renderDriveDashboard();
+        }, 1500);
+      } else {
+        showToast('Backup failed: ' + res.error, 'error');
+        $('#driveSyncNowBtn').disabled = false;
+      }
+    } catch (e) {
+      console.error(e);
+      showToast('Backup error', 'error');
+      $('#driveSyncNowBtn').disabled = false;
+    }
+  });
+
+  ipcRenderer.on('drive-sync-progress', (event, { current, total }) => {
+    const pct = Math.round((current / total) * 100);
+    $('#driveProgressBar').style.width = `${pct}%`;
+    $('#driveProgressPercent').textContent = `${pct}%`;
+    $('#driveProgressText').textContent = `Uploading script ${current} of ${total}...`;
+  });
+
   document.addEventListener('DOMContentLoaded', () => {
     init();
+    setupToolsSidebar();
+    setupStatsDropdowns();
     initRipples();
   });
 })();
