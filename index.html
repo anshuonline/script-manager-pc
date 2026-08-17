@@ -9,6 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="components/characters/characters.css">
   <link rel="icon" href="logo.png">
 </head>
 <body>
@@ -27,7 +28,7 @@
         <button id="statsTab" class="rail-tab" data-view="stats" title="Statistics">
           <span class="rail-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg></span>
         </button>
-        <button id="driveTab" class="rail-tab" data-view="drive" title="Google Drive Backup">
+        <button id="driveTab" class="rail-tab" data-view="drive" title="Backup & Restore">
           <span class="rail-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19a5.5 5.5 0 0 0 0-11 5.5 5.5 0 0 0-11 0A5.5 5.5 0 0 0 6.5 19h11z"></path></svg></span>
         </button>
       </div>
@@ -75,14 +76,14 @@
           <!-- empty for now or breadcrumbs -->
         </div>
         <div class="editor-header-right">
-          <button id="openTeleprompterRailBtn" class="btn-icon" title="Teleprompter" style="display:none; font-size: 16px;">
-            📺
+          <button id="openTeleprompterRailBtn" class="btn-icon" title="Teleprompter" style="display:none; padding: 6px;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="15" rx="2" ry="2"></rect><polyline points="17 2 12 7 7 2"></polyline></svg>
           </button>
-          <button id="printScriptBtn" class="btn-icon" title="Print Script (Ctrl+P)" style="display:none">
-            🖨️
+          <button id="printScriptBtn" class="btn-icon" title="Print Script (Ctrl+P)" style="display:none; padding: 6px;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
           </button>
-          <button id="deleteScriptBtn" class="btn-icon btn-danger" title="Delete Script" style="display:none">
-            🗑️
+          <button id="deleteScriptBtn" class="btn-icon btn-danger" title="Delete Script" style="display:none; padding: 6px;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
           </button>
         </div>
       </header>
@@ -124,8 +125,8 @@
             <!-- Toolbar -->
             <div id="toolbar" class="editor-toolbar">
               <div class="toolbar-group">
-                <button class="toolbar-btn" data-command="undo" title="Undo (Ctrl+Z)">⟲</button>
-                <button class="toolbar-btn" data-command="redo" title="Redo (Ctrl+Y)">⟳</button>
+                <button class="toolbar-btn" data-command="undo" title="Undo (Ctrl+Z)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"></path><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"></path></svg></button>
+                <button class="toolbar-btn" data-command="redo" title="Redo (Ctrl+Y)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 7v6h-6"></path><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3l3 2.7"></path></svg></button>
               </div>
               <div class="toolbar-divider"></div>
               <div class="toolbar-group">
@@ -155,9 +156,9 @@
               </div>
               <div class="toolbar-divider"></div>
               <div class="toolbar-group">
-                <button class="toolbar-btn" data-command="formatBlock" data-value="blockquote" title="Blockquote">❞</button>
-                <button class="toolbar-btn" id="linkBtn" title="Insert Link">🔗</button>
-                <button class="toolbar-btn" id="colorBtn" title="Text Color">🎨</button>
+                <button class="toolbar-btn" data-command="formatBlock" data-value="blockquote" title="Blockquote"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V20c0 1 0 1 1 1z"></path><path d="M15 21c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h.75c0 2.25.25 4-2.75 4v3c0 1 0 1 1 1z"></path></svg></button>
+                <button class="toolbar-btn" id="linkBtn" title="Insert Link"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg></button>
+                <button class="toolbar-btn" id="colorBtn" title="Text Color"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="10.5" r="1.5"></circle><circle cx="8.5" cy="10.5" r="1.5"></circle><circle cx="11" cy="7.5" r="1.5"></circle><path d="M21 16c0 1.1-.9 2-2 2-1.33 0-1.53-1-2.4-1-.87 0-1.07 1-2.4 1H7.8C4.6 18 2 15.4 2 12.2A10.2 10.2 0 0 1 12.2 2C17.6 2 22 6.4 22 11.8c0 1.94-.48 3.82-1.39 5.48-.12.21-.29.39-.49.52z"></path></svg></button>
                 <input type="color" id="colorPicker" value="#a599ff" hidden>
               </div>
               <div class="toolbar-divider"></div>
@@ -185,6 +186,7 @@
           <div class="tools-tabs">
             <button class="tools-tab-btn active" data-tab="insert">Insert</button>
             <button class="tools-tab-btn" data-tab="parts">Parts</button>
+            <button class="tools-tab-btn" data-tab="characters" id="openCharactersViewBtn">Characters</button>
           </div>
 
           <!-- Tab Panels -->
@@ -241,6 +243,31 @@
                 <p class="parts-hint">Select text in editor → Right click → <b>Make Part</b></p>
                 <div id="partsList" class="parts-list">
                   <!-- Part items will be injected here -->
+                </div>
+              </div>
+            </div>
+
+            <!-- Characters Tab -->
+            <div id="tab-characters" class="tools-panel">
+              <div class="characters-sidebar-container" style="display:flex; flex-direction:column; height:100%;">
+                <div class="parts-sidebar-header" style="justify-content: space-between;">
+                  <span>Characters</span>
+                  <button id="addCharacterBtn" class="btn-primary" style="padding: 2px 8px; font-size: 11px;">+ Add</button>
+                </div>
+                <div class="parts-sidebar-body" style="padding: 0;">
+                  <div id="charactersList" class="characters-list" style="padding: 12px;"></div>
+                </div>
+                <div style="padding: 12px; border-top: 1px solid var(--border); text-align: center;">
+                  <button id="openNodeGraphBtn" class="btn-secondary" style="width: 100%; font-size: 12px;" onclick="if(window.showNodeGraphModal) { window.showNodeGraphModal(); } else { alert('Function not found!'); }">View Node Graph</button>
+                </div>
+              </div>
+              <div id="characterDetailPanel" class="character-detail-panel" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg-elevated); z-index: 10; flex-direction: column;">
+                <div class="parts-sidebar-header">
+                  <button id="backToCharListBtn" class="btn-icon" style="margin-right: 8px;">◀</button>
+                  <span>Edit Character</span>
+                </div>
+                <div class="parts-sidebar-body" style="padding: 12px; overflow-y: auto;">
+                  <div id="charContent"></div>
                 </div>
               </div>
             </div>
@@ -774,11 +801,27 @@
           <div id="ppBody" class="pp-body editor-content"></div>
         </div>
       </div>
-    </div>
+
+    </main>
   </div>
 
   <!-- ═══════════════ Toast Notifications ═══════════════ -->
   <div id="toastContainer" class="toast-container"></div>
+
+  <!-- ═══════════════ Node Graph Modal ═══════════════ -->
+  <div id="nodeGraphModal" class="prompt-overlay" hidden>
+    <div class="prompt-dialog" style="width: 800px; max-width: 95vw; height: 600px; display: flex; flex-direction: column;">
+      <div class="mui-dialog-title">
+        <span style="display:flex; align-items:center; justify-content:space-between; width:100%;">
+          Character Node Graph
+          <button id="closeNodeGraphBtn" class="btn-icon" onclick="document.getElementById('nodeGraphModal').hidden = true;">✕</button>
+        </span>
+      </div>
+      <div class="mui-dialog-content" style="flex: 1; display: flex; padding: 0;">
+        <div id="characterNetwork" style="width: 100%; height: 100%; background: #1a1a24;"></div>
+      </div>
+    </div>
+  </div>
 
   <!-- ── Custom Prompt Modal ── -->
   <div id="customPromptOverlay" class="prompt-overlay mui-dialog-backdrop" hidden>
@@ -845,6 +888,9 @@
     </div>
   </div>
 
+  <script src="components/characters/vis-network.min.js"></script>
+  <script src="components/characters/characters.js"></script>
+  <script src="components/characters/editor-mention.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

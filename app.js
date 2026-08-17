@@ -23,6 +23,7 @@
   // ── State ──────────────────────────────────────────────────
   let state = {
     scripts: [],
+    characters: [],
     activeScriptId: null,
     currentView: 'editor',
     calendarDate: new Date(),
@@ -87,6 +88,11 @@
   }
 
   // ── Persistence ────────────────────────────────────────────
+  // Expose for external modules
+  window.appState = state;
+  window.saveState = save;
+  window.showToast = showToast;
+
   function save() {
     try {
       const data = { 
@@ -119,6 +125,7 @@
         state.scripts = data.scripts || [];
         state.editorFontSize = data.editorFontSize || 15;
         state = { ...state, ...data };
+        window.appState = state; // Update global reference
         // Ensure shortcuts object exists (for backwards compatibility)
         if (!state.tpShortcuts) {
           state.tpShortcuts = {
@@ -299,7 +306,6 @@
       // If 'all', do not show deleted scripts
       filtered = filtered.filter((s) => s.status !== 'deleted');
     }
-
     if (filtered.length === 0) {
       listEl.innerHTML = `
         <div style="padding: 20px; text-align: center; color: var(--text-muted); font-size: 13px;">
@@ -1127,6 +1133,7 @@
         renderSidebar();
       });
     }
+
 
     // Theme Toggle removed. Always dark mode.
     state.theme = 'dark';

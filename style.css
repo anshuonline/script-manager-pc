@@ -845,7 +845,7 @@ body {
 /* Parts Sidebar */
 /* ── Tools Sidebar (formerly Parts) ── */
 .tools-sidebar {
-  width: 280px; /* Slightly wider for block buttons */
+  width: 290px;
   background: var(--bg-elevated);
   border-left: 1px solid var(--border);
   display: flex;
@@ -946,6 +946,10 @@ body {
   transform: translateY(-1px);
 }
 
+.insert-block-btn:active {
+  transform: translateY(0);
+}
+
 .insert-block-btn .block-icon {
   width: 24px;
   height: 24px;
@@ -958,8 +962,10 @@ body {
   font-size: 12px;
   color: var(--text-muted);
 }
+
 .insert-block-btn:hover .block-icon {
-  color: var(--primary);
+  background: rgba(110,106,255,0.2);
+  transform: scale(1.1);
 }
 
 /* Ensure parts sidebar styles still work inside the panel */

@@ -27,17 +27,19 @@
       "app.js",
       "sync-server.js",
       "icon1.ico",
-      "logo.png"
+      "logo.png",
+      "components/**/*"
     ],
     "win": {
       "target": "nsis",
       "icon": "icon1.ico"
     },
     "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true,
-      "createStartMenuShortcut": true
+      "oneClick": true,
+      "perMachine": false,
+      "createDesktopShortcut": "always",
+      "createStartMenuShortcut": true,
+      "runAfterFinish": true
     }
   },
   "dependencies": {
