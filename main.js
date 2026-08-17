@@ -3,7 +3,7 @@ const path = require('path');
 const os = require('os');
 const fs = require('fs');
 const { startSyncServer, stopSyncServer, getLocalIP } = require('./sync-server');
-const { getAuthUrl, handleCallback, syncScripts, MOCK_MODE } = require('./drive-sync');
+const JSZip = require('jszip');
 
 // Keep a global reference to prevent garbage collection
 let mainWindow;
@@ -58,30 +58,89 @@ function createWindow() {
   });
 }
 
-// ── Google Drive Sync Handlers ──
-ipcMain.handle('drive-connect', async (event) => {
-  const url = getAuthUrl();
-  if (MOCK_MODE) {
-    // Simulate auth success
-    const result = await handleCallback('mock_code');
-    return { success: true, email: result.email };
-  } else {
-    shell.openExternal(url);
-    // In real mode, sync-server would handle the callback and send a message back to mainWindow
-    return { success: true, pending: true };
+// ── Local Backup & Restore Handlers ──
+ipcMain.handle('create-backup', async (event, stateData) => {
+  try {
+    const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {
+      title: 'Save Script Manager Backup',
+      defaultPath: 'ScriptManager_Backup.smbackup',
+      filters: [{ name: 'Script Manager Backup', extensions: ['smbackup'] }]
+    });
+
+    if (canceled) {
+      return { success: false, canceled: true };
+    }
+
+    const zip = new JSZip();
+    
+    // Add data.json
+    zip.file('data.json', JSON.stringify(stateData));
+    
+    // Include images from the user's data folder if they exist
+    const userDataPath = path.join(process.env.APPDATA || process.env.USERPROFILE, 'ScriptManagerData');
+    if (fs.existsSync(userDataPath)) {
+      const files = fs.readdirSync(userDataPath);
+      for (const file of files) {
+        if (file.endsWith('.jpg') || file.endsWith('.png') || file.endsWith('.jpeg')) {
+          const content = fs.readFileSync(path.join(userDataPath, file));
+          zip.file(file, content);
+        }
+      }
+    }
+
+    // Generate zip content
+    const content = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE', compressionOptions: { level: 9 } });
+    
+    // Write to selected path
+    fs.writeFileSync(filePath, content);
+
+    return { success: true };
+  } catch (err) {
+    console.error('Backup Error:', err);
+    return { success: false, error: err.message };
   }
 });
 
-ipcMain.handle('drive-sync', async (event, scripts) => {
+ipcMain.handle('restore-backup', async (event) => {
   try {
-    await syncScripts(scripts, (current, total) => {
-      if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send('drive-sync-progress', { current, total });
-      }
+    const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
+      title: 'Import Script Manager Backup',
+      filters: [{ name: 'Script Manager Backup', extensions: ['smbackup'] }],
+      properties: ['openFile']
     });
-    return { success: true };
+
+    if (canceled || filePaths.length === 0) {
+      return { success: false, canceled: true };
+    }
+
+    const backupPath = filePaths[0];
+    const buffer = fs.readFileSync(backupPath);
+    const zip = await JSZip.loadAsync(buffer);
+
+    // Read data.json
+    const dataFile = zip.file('data.json');
+    if (!dataFile) {
+      return { success: false, error: 'Invalid backup file: data.json is missing.' };
+    }
+    const stateJson = await dataFile.async('string');
+
+    // Restore images to the userdata path
+    const userDataPath = path.join(process.env.APPDATA || process.env.USERPROFILE, 'ScriptManagerData');
+    if (!fs.existsSync(userDataPath)) {
+      fs.mkdirSync(userDataPath, { recursive: true });
+    }
+
+    const files = Object.keys(zip.files);
+    for (const fileName of files) {
+      if (fileName !== 'data.json' && !zip.files[fileName].dir) {
+        const fileContent = await zip.file(fileName).async('nodebuffer');
+        fs.writeFileSync(path.join(userDataPath, fileName), fileContent);
+      }
+    }
+
+    return { success: true, data: stateJson };
   } catch (err) {
-    console.error(err);
+    console.error('Restore Error:', err);
     return { success: false, error: err.message };
   }
 });

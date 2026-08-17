@@ -3273,95 +3273,106 @@
     }
   });
 
-  // ── Drive Sync Logic ─────────────────────────────────────────
+  // ── Local Backup & Restore Logic ─────────────────────────────────────────
   function renderDriveDashboard() {
-    const notConnected = $('#driveNotConnectedState');
-    const connected = $('#driveConnectedState');
-    
-    if (state.driveConnectedEmail) {
-      notConnected.style.display = 'none';
-      connected.style.display = 'block';
-      $('#driveEmailText').textContent = state.driveConnectedEmail;
-      if (state.driveLastBackup) {
-        const d = new Date(state.driveLastBackup);
-        $('#driveLastBackupText').textContent = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) + ' at ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-      } else {
-        $('#driveLastBackupText').textContent = 'Never';
-      }
-      $('#driveSyncProgressContainer').style.display = 'none';
-      $('#driveSyncNowBtn').disabled = false;
+    if (state.driveLastBackup) {
+      const d = new Date(state.driveLastBackup);
+      $('#localLastBackupText').textContent = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) + ' at ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
     } else {
-      notConnected.style.display = 'block';
-      connected.style.display = 'none';
-      $('#driveConnectingLoader').style.display = 'none';
-      $('#driveConnectBtn').disabled = false;
+      $('#localLastBackupText').textContent = 'Never';
     }
   }
 
-  $('#driveConnectBtn')?.addEventListener('click', async () => {
-    $('#driveConnectingLoader').style.display = 'block';
-    $('#driveConnectBtn').disabled = true;
+  function showBackupOverlay(title, text) {
+    $('#backupProgressOverlay').style.display = 'flex';
+    $('#backupProgressTitle').textContent = title;
+    $('#backupProgressText').textContent = text;
+    $('#backupProgressBar').style.width = '0%';
+    $('#backupCloseBtn').style.display = 'none';
+    $('#backupSpinner').style.display = 'block';
+  }
+
+  $('#backupCloseBtn')?.addEventListener('click', () => {
+    $('#backupProgressOverlay').style.display = 'none';
+  });
+
+  $('#createBackupBtn')?.addEventListener('click', async () => {
     try {
-      const res = await ipcRenderer.invoke('drive-connect');
-      if (res.success && res.email) {
-        state.driveConnectedEmail = res.email;
-        save();
-        renderDriveDashboard();
-        showToast('Connected to Google Drive', 'success');
-      } else if (res.pending) {
-        // Will be handled via a callback IPC if implemented, 
-        // but for mock mode it instantly returns. 
-        // For real mode, we'd need a listener: ipcRenderer.on('drive-connected', ...)
+      showBackupOverlay('Creating Backup...', 'Please choose where to save your backup file.');
+      
+      const res = await ipcRenderer.invoke('create-backup', state);
+      if (res.canceled) {
+        $('#backupProgressOverlay').style.display = 'none';
+        return;
       }
-    } catch (e) {
-      console.error(e);
-      showToast('Failed to connect', 'error');
-      $('#driveConnectingLoader').style.display = 'none';
-      $('#driveConnectBtn').disabled = false;
-    }
-  });
-
-  $('#driveDisconnectBtn')?.addEventListener('click', () => {
-    if (confirm('Are you sure you want to disconnect from Google Drive?')) {
-      state.driveConnectedEmail = null;
-      save();
-      renderDriveDashboard();
-      showToast('Disconnected from Google Drive', 'info');
-    }
-  });
-
-  $('#driveSyncNowBtn')?.addEventListener('click', async () => {
-    $('#driveSyncProgressContainer').style.display = 'block';
-    $('#driveSyncNowBtn').disabled = true;
-    $('#driveProgressBar').style.width = '0%';
-    $('#driveProgressPercent').textContent = '0%';
-    $('#driveProgressText').textContent = 'Preparing files...';
-
-    try {
-      const res = await ipcRenderer.invoke('drive-sync', state.scripts);
+      
       if (res.success) {
+        $('#backupProgressBar').style.width = '100%';
+        $('#backupProgressTitle').textContent = 'Success!';
+        $('#backupProgressText').textContent = 'Your backup has been saved successfully.';
+        $('#backupSpinner').style.display = 'none';
+        $('#backupCloseBtn').style.display = 'inline-block';
+        
         state.driveLastBackup = new Date().toISOString();
         save();
-        showToast('Backup completed successfully!', 'success');
-        setTimeout(() => {
-          renderDriveDashboard();
-        }, 1500);
+        renderDriveDashboard();
       } else {
-        showToast('Backup failed: ' + res.error, 'error');
-        $('#driveSyncNowBtn').disabled = false;
+        throw new Error(res.error);
       }
     } catch (e) {
       console.error(e);
-      showToast('Backup error', 'error');
-      $('#driveSyncNowBtn').disabled = false;
+      $('#backupProgressBar').style.width = '0%';
+      $('#backupProgressTitle').textContent = 'Error';
+      $('#backupProgressText').textContent = e.message || 'Failed to create backup.';
+      $('#backupSpinner').style.display = 'none';
+      $('#backupCloseBtn').style.display = 'inline-block';
     }
   });
 
-  ipcRenderer.on('drive-sync-progress', (event, { current, total }) => {
-    const pct = Math.round((current / total) * 100);
-    $('#driveProgressBar').style.width = `${pct}%`;
-    $('#driveProgressPercent').textContent = `${pct}%`;
-    $('#driveProgressText').textContent = `Uploading script ${current} of ${total}...`;
+  $('#restoreBackupBtn')?.addEventListener('click', async () => {
+    try {
+      showBackupOverlay('Importing Backup...', 'Please select your .smbackup file.');
+      
+      const res = await ipcRenderer.invoke('restore-backup');
+      if (res.canceled) {
+        $('#backupProgressOverlay').style.display = 'none';
+        return;
+      }
+      
+      if (res.success && res.data) {
+        $('#backupProgressBar').style.width = '100%';
+        $('#backupProgressTitle').textContent = 'Success!';
+        $('#backupProgressText').textContent = 'Your backup has been restored. Reloading...';
+        $('#backupSpinner').style.display = 'none';
+        
+        // Parse the restored data and overwrite state
+        const restoredState = typeof res.data === 'string' ? JSON.parse(res.data) : res.data;
+        if (restoredState && Array.isArray(restoredState.scripts)) {
+          state.scripts = restoredState.scripts;
+          state.theme = restoredState.theme || state.theme;
+          // Apply theme right away
+          document.documentElement.dataset.theme = state.theme;
+          save(); // Save to local storage
+          
+          setTimeout(() => {
+            $('#backupProgressOverlay').style.display = 'none';
+            render();
+            showToast('Backup restored successfully!', 'success');
+          }, 1500);
+        } else {
+          throw new Error('Invalid backup file format.');
+        }
+      } else {
+        throw new Error(res.error || 'Failed to restore backup.');
+      }
+    } catch (e) {
+      console.error(e);
+      $('#backupProgressBar').style.width = '0%';
+      $('#backupProgressTitle').textContent = 'Error';
+      $('#backupProgressText').textContent = e.message || 'Failed to read backup file.';
+      $('#backupSpinner').style.display = 'none';
+      $('#backupCloseBtn').style.display = 'inline-block';
+    }
   });
 
   document.addEventListener('DOMContentLoaded', () => {
