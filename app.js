@@ -1803,6 +1803,16 @@
             case 'make-part':
               window.createPartFromSelection();
               break;
+            case 'case-toggle': {
+              const currentSel = window.getSelection();
+              if (currentSel && currentSel.rangeCount > 0 && !currentSel.isCollapsed) {
+                const text = currentSel.toString();
+                const isUpper = text === text.toUpperCase();
+                const newText = isUpper ? text.toLowerCase() : text.toUpperCase();
+                document.execCommand('insertText', false, newText);
+              }
+              break;
+            }
             case 'insert-row-above':
               if (ctxCurrentTableCell) insertTableRow(ctxCurrentTableCell, 'above');
               break;
