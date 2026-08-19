@@ -39,6 +39,50 @@ function createWindow() {
   // Remove the default menu bar
   Menu.setApplicationMenu(null);
 
+  // Native Context Menu (Copy, Paste, Spell Check)
+  mainWindow.webContents.on('context-menu', (event, params) => {
+    const { selectionText, isEditable } = params;
+    const template = [];
+
+    // Spelling suggestions
+    if (params.dictionarySuggestions && params.dictionarySuggestions.length > 0) {
+      params.dictionarySuggestions.forEach(suggestion => {
+        template.push({
+          label: suggestion,
+          click: () => mainWindow.webContents.replaceMisspelling(suggestion)
+        });
+      });
+      template.push({ type: 'separator' });
+      template.push({
+        label: 'Add to Dictionary',
+        click: () => mainWindow.webContents.session.addWordToSpellCheckerDictionary(params.misspelledWord)
+      });
+      template.push({ type: 'separator' });
+    }
+
+    if (isEditable) {
+      template.push({ role: 'undo' });
+      template.push({ role: 'redo' });
+      template.push({ type: 'separator' });
+      template.push({ role: 'cut' });
+    }
+    
+    if (selectionText || isEditable) {
+      template.push({ role: 'copy' });
+    }
+
+    if (isEditable) {
+      template.push({ role: 'paste' });
+      template.push({ role: 'pasteAndMatchStyle' });
+    }
+    
+    template.push({ type: 'separator' });
+    template.push({ role: 'selectAll' });
+
+    const menu = Menu.buildFromTemplate(template);
+    menu.popup({ window: mainWindow, x: params.x, y: params.y });
+  });
+
   // Load the app
   mainWindow.loadFile('index.html');
 
