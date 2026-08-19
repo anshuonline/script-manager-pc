@@ -1728,39 +1728,46 @@
 
     if (editorEl && ctxMenu) {
       editorEl.addEventListener('contextmenu', (e) => {
-        const sel = window.getSelection();
-        if (sel && !sel.isCollapsed) {
-          ctxSavedRange = sel.getRangeAt(0).cloneRange();
-        } else {
-          ctxSavedRange = null;
+        try {
+          const sel = window.getSelection();
+          if (sel && !sel.isCollapsed) {
+            ctxSavedRange = sel.getRangeAt(0).cloneRange();
+          } else {
+            ctxSavedRange = null;
+          }
+
+          // Always show our custom menu, not just for tables!
+          e.preventDefault();
+
+          // Safe check for table cell
+          let targetEl = e.target;
+          if (targetEl.nodeType === 3) targetEl = targetEl.parentNode; // Handle text nodes
+          
+          const tableCell = targetEl.closest ? targetEl.closest('td, th') : null;
+          if (tableCell) {
+            ctxCurrentTableCell = tableCell;
+          } else {
+            ctxCurrentTableCell = null;
+          }
+          const tableControls = ctxMenu.querySelectorAll('.table-control');
+          tableControls.forEach(ctrl => {
+            ctrl.style.display = tableCell ? 'flex' : 'none'; // Use flex for ctx-menu-item
+          });
+
+          ctxMenu.hidden = false;
+          // Position the menu
+          let x = e.clientX;
+          let y = e.clientY;
+          // Prevent going off screen
+          const menuW = 180;
+          const menuH = 200;
+          if (x + menuW > window.innerWidth) x = window.innerWidth - menuW - 8;
+          if (y + menuH > window.innerHeight) y = window.innerHeight - menuH - 8;
+          ctxMenu.style.left = x + 'px';
+          ctxMenu.style.top = y + 'px';
+        } catch (err) {
+          alert("RIGHT CLICK ERROR: " + err.message + "\n" + err.stack);
         }
-
-        // Always show our custom menu, not just for tables!
-        e.preventDefault();
-
-        // If it's a table cell, save it for table-specific operations
-        const tableCell = e.target.closest('td, th');
-        if (tableCell) {
-          ctxCurrentTableCell = tableCell;
-        } else {
-          ctxCurrentTableCell = null;
-        }
-        const tableControls = ctxMenu.querySelectorAll('.table-control');
-        tableControls.forEach(ctrl => {
-          ctrl.style.display = tableCell ? 'flex' : 'none'; // Use flex for ctx-menu-item
-        });
-
-        ctxMenu.hidden = false;
-        // Position the menu
-        let x = e.clientX;
-        let y = e.clientY;
-        // Prevent going off screen
-        const menuW = 180;
-        const menuH = 200;
-        if (x + menuW > window.innerWidth) x = window.innerWidth - menuW - 8;
-        if (y + menuH > window.innerHeight) y = window.innerHeight - menuH - 8;
-        ctxMenu.style.left = x + 'px';
-        ctxMenu.style.top = y + 'px';
       });
 
       // Close context menu on click elsewhere
