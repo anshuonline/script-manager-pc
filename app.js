@@ -1799,7 +1799,7 @@
               document.execCommand('backColor', false, 'transparent');
               break;
             case 'make-part':
-              createPartFromSelection();
+              window.createPartFromSelection();
               break;
             case 'insert-row-above':
               if (ctxCurrentTableCell) insertTableRow(ctxCurrentTableCell, 'above');
@@ -1827,7 +1827,7 @@
       });
     }
 
-    function createPartFromSelection() {
+    window.createPartFromSelection = function createPartFromSelection() {
       const sel = window.getSelection();
       if (!sel || sel.isCollapsed || sel.rangeCount === 0) {
         alert('Pehle kuch text select kijiye!');
@@ -2552,7 +2552,11 @@
 
         switch (action) {
           case 'make-part':
-            createPartFromSelection();
+            if (typeof window.createPartFromSelection === 'function') {
+              window.createPartFromSelection();
+            } else {
+              alert('Error: createPartFromSelection not ready yet!');
+            }
             break;
           case 'insert-broll':
             document.execCommand('insertText', false, '[B-ROLL]');
