@@ -2245,6 +2245,11 @@
       }
     });
 
+    $('#replaceBtn').addEventListener('mousedown', (e) => e.preventDefault());
+    $('#replaceAllBtn').addEventListener('mousedown', (e) => e.preventDefault());
+    $('#findNextBtn').addEventListener('mousedown', (e) => e.preventDefault());
+    $('#findPrevBtn').addEventListener('mousedown', (e) => e.preventDefault());
+
     $('#findNextBtn').addEventListener('click', () => doFind(false));
     $('#findPrevBtn').addEventListener('click', () => doFind(true));
     
@@ -2518,6 +2523,11 @@
 
     // Listen for native context menu actions from main process
     ipcRenderer.on('context-menu-action', (event, action) => {
+      // Debug toast to ensure IPC works
+      if (typeof showToast === 'function') {
+        showToast('Action received: ' + action, 'success');
+      }
+      
       setTimeout(() => {
         const editorEl = $('#editor');
         if (editorEl) editorEl.focus();
@@ -2526,6 +2536,10 @@
           const sel = window.getSelection();
           sel.removeAllRanges();
           sel.addRange(ctxSavedRange);
+        } else {
+          if (typeof showToast === 'function') {
+            showToast('Warning: No saved selection!', 'error');
+          }
         }
 
         switch (action) {
@@ -2552,7 +2566,7 @@
             document.execCommand('removeFormat');
             break;
         }
-      }, 50);
+      }, 100); // increased timeout to ensure focus
     });
 
     window.activePartItemContextMenu = null;
