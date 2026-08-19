@@ -1720,20 +1720,19 @@
 
     if (editorEl && ctxMenu) {
       editorEl.addEventListener('contextmenu', (e) => {
-        const tableCell = e.target.closest('td, th');
-        if (!tableCell) {
-          // Normal text: let native browser context menu handle spelling/copy/paste
-          return;
-        }
-
-        e.preventDefault();
         const sel = window.getSelection();
         if (sel && !sel.isCollapsed) {
-          // Save the selection range before the menu opens
           ctxSavedRange = sel.getRangeAt(0).cloneRange();
         } else {
           ctxSavedRange = null;
         }
+
+        const tableCell = e.target.closest('td, th');
+        if (!tableCell) {
+          return;
+        }
+
+        e.preventDefault();
 
         ctxCurrentTableCell = tableCell;
         const tableControls = ctxMenu.querySelectorAll('.table-control');
@@ -2513,6 +2512,47 @@
           break;
         case 'close':
           closeTeleprompter();
+          break;
+      }
+    });
+
+    // Listen for native context menu actions from main process
+    const { ipcRenderer } = require('electron');
+    ipcRenderer.on('context-menu-action', (event, action) => {
+      // Restore selection if saved
+      if (ctxSavedRange) {
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(ctxSavedRange);
+      }
+
+      switch (action) {
+        case 'make-part':
+          createPartFromSelection();
+          break;
+        case 'insert-broll':
+          document.execCommand('insertText', false, '[B-ROLL]');
+          // Note: previous implementation used insertBRollMarker, let's call that if it exists
+          if (typeof insertBRollMarker === 'function') {
+             // Rollback text insertion and use proper function
+             document.execCommand('undo');
+             insertBRollMarker();
+          }
+          break;
+        case 'highlight':
+          document.execCommand('backColor', false, 'yellow');
+          break;
+        case 'case-toggle':
+          const sel = window.getSelection();
+          if (sel && sel.rangeCount > 0 && !sel.isCollapsed) {
+            const text = sel.toString();
+            const isUpper = text === text.toUpperCase();
+            const newText = isUpper ? text.toLowerCase() : text.toUpperCase();
+            document.execCommand('insertText', false, newText);
+          }
+          break;
+        case 'clear-format':
+          document.execCommand('removeFormat');
           break;
       }
     });

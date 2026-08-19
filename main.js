@@ -74,6 +74,33 @@ function createWindow() {
     if (isEditable) {
       template.push({ role: 'paste' });
       template.push({ role: 'pasteAndMatchStyle' });
+      
+      template.push({ type: 'separator' });
+      
+      if (selectionText && selectionText.trim() !== '') {
+        template.push({
+          label: '🎬 Make Part',
+          click: () => mainWindow.webContents.send('context-menu-action', 'make-part')
+        });
+        template.push({
+          label: '🖍️ Highlight Yellow',
+          click: () => mainWindow.webContents.send('context-menu-action', 'highlight')
+        });
+        template.push({
+          label: 'Aa Toggle Case',
+          click: () => mainWindow.webContents.send('context-menu-action', 'case-toggle')
+        });
+        template.push({
+          label: 'T✕ Clear Formatting',
+          click: () => mainWindow.webContents.send('context-menu-action', 'clear-format')
+        });
+        template.push({ type: 'separator' });
+      }
+      
+      template.push({
+        label: '📽️ Insert B-Roll Marker',
+        click: () => mainWindow.webContents.send('context-menu-action', 'insert-broll')
+      });
     }
     
     template.push({ type: 'separator' });
