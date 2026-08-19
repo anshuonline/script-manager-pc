@@ -134,6 +134,7 @@
                 <button class="toolbar-btn" data-command="formatBlock" data-value="h1" title="Heading 1">H1</button>
                 <button class="toolbar-btn" data-command="formatBlock" data-value="h2" title="Heading 2">H2</button>
                 <button class="toolbar-btn" data-command="formatBlock" data-value="h3" title="Heading 3">H3</button>
+                <button class="toolbar-btn" data-command="fontName" data-value="Courier New" title="Typewriter Font (Courier)">Typewriter</button>
               </div>
               <div class="toolbar-divider"></div>
               <div class="toolbar-group">
@@ -141,6 +142,8 @@
                 <button class="toolbar-btn" data-command="italic" title="Italic (Ctrl+I)"><i>I</i></button>
                 <button class="toolbar-btn" data-command="underline" title="Underline (Ctrl+U)"><u>U</u></button>
                 <button class="toolbar-btn" data-command="strikeThrough" title="Strikethrough"><s>S</s></button>
+                <button class="toolbar-btn" data-command="removeFormat" title="Clear Formatting" style="font-weight:bold;">T<span style="font-size:10px">✕</span></button>
+                <button class="toolbar-btn" id="caseToggleBtn" title="Toggle UPPERCASE / lowercase">Aa</button>
               </div>
               <div class="toolbar-divider"></div>
               <div class="toolbar-group">
@@ -153,11 +156,18 @@
                 <button class="toolbar-btn" data-command="justifyRight" title="Align Right">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="9" y1="12" x2="21" y2="12"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
                 </button>
+                <button class="toolbar-btn" data-command="insertUnorderedList" title="Bullet List">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
+                </button>
+                <button class="toolbar-btn" data-command="insertOrderedList" title="Numbered List">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="10" y1="6" x2="21" y2="6"></line><line x1="10" y1="12" x2="21" y2="12"></line><line x1="10" y1="18" x2="21" y2="18"></line><path d="M4 6h1v4"></path><path d="M4 10h2"></path><path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1"></path></svg>
+                </button>
               </div>
               <div class="toolbar-divider"></div>
               <div class="toolbar-group">
                 <button class="toolbar-btn" data-command="formatBlock" data-value="blockquote" title="Blockquote"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V20c0 1 0 1 1 1z"></path><path d="M15 21c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h.75c0 2.25.25 4-2.75 4v3c0 1 0 1 1 1z"></path></svg></button>
                 <button class="toolbar-btn" id="linkBtn" title="Insert Link"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg></button>
+                <button class="toolbar-btn" data-command="hiliteColor" data-value="yellow" title="Highlight Yellow" style="color: #ffea00;">🖍️</button>
                 <div class="color-picker-wrapper" style="position: relative;">
                   <button class="toolbar-btn" id="colorBtn" title="Text Color">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -202,7 +212,13 @@
                 </div>
               </div>
               <div class="toolbar-divider"></div>
-              <div class="toolbar-group" style="align-items: center; padding: 0 8px;">
+              <div class="toolbar-group">
+                <button class="toolbar-btn" id="lineSpacingBtn" title="Toggle Double Spacing">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="4" x2="12" y2="20"></line><polyline points="8 8 12 4 16 8"></polyline><polyline points="8 16 12 20 16 16"></polyline></svg>
+                </button>
+              </div>
+              <div class="toolbar-divider"></div>
+              <div class="toolbar-group font-size-group" style="align-items: center; padding: 0 8px;">
                 <span style="font-size: 12px; color: var(--text-muted); margin-right: 8px;">Aa</span>
                 <input type="range" id="fontSizeSlider" min="12" max="32" value="15" step="1" title="Adjust Editor Font Size" class="font-size-slider">
               </div>

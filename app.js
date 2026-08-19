@@ -31,6 +31,8 @@
     statusFilter: 'all',
     theme: 'dark',
     editorFontSize: 15,
+    editorLineHeight: '1.6',
+    sidebarWidth: 260,
     tpSpeed: 0.5,
     tpMargin: 15,
     tpLineHeight: 1.6,
@@ -97,8 +99,10 @@
     try {
       const data = { 
         scripts: state.scripts,
+        theme: state.theme,
         editorFontSize: state.editorFontSize,
-        theme: state.theme
+        editorLineHeight: state.editorLineHeight,
+        sidebarWidth: state.sidebarWidth
       };
       fs.writeFileSync(DATA_FILE, JSON.stringify(data), 'utf8');
     } catch (e) {
@@ -123,7 +127,10 @@
       if (raw) {
         const data = JSON.parse(raw);
         state.scripts = data.scripts || [];
+        state.theme = data.theme || 'dark';
         state.editorFontSize = data.editorFontSize || 15;
+        state.editorLineHeight = data.editorLineHeight || '1.6';
+        state.sidebarWidth = data.sidebarWidth || 260;
         state = { ...state, ...data };
         window.appState = state; // Update global reference
         // Ensure shortcuts object exists (for backwards compatibility)
@@ -457,6 +464,10 @@
     if (editor) {
       editor.innerHTML = script.content || '';
       editor.style.fontSize = `${state.editorFontSize}px`;
+      editor.style.lineHeight = state.editorLineHeight || '1.6';
+      if (state.editorLineHeight === '2.5') {
+        $('#lineSpacingBtn')?.classList.add('active');
+      }
       updatePartsSidebar();
       if (typeof updateEditorStats === 'function') {
         updateEditorStats();
@@ -1885,6 +1896,41 @@
         state.editorFontSize = e.target.value;
         save();
       });
+    }
+
+    // Case Toggle (Aa)
+    const caseToggleBtn = $('#caseToggleBtn');
+    if (caseToggleBtn) {
+      caseToggleBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        const sel = window.getSelection();
+        if (sel && sel.rangeCount > 0 && !sel.isCollapsed) {
+          const text = sel.toString();
+          const isUpper = text === text.toUpperCase();
+          const newText = isUpper ? text.toLowerCase() : text.toUpperCase();
+          document.execCommand('insertText', false, newText);
+        }
+      });
+      caseToggleBtn.addEventListener('mousedown', (e) => e.preventDefault());
+    }
+
+    // Line Spacing Toggle
+    const lineSpacingBtn = $('#lineSpacingBtn');
+    if (lineSpacingBtn) {
+      lineSpacingBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        const currentLineHeight = editor.style.lineHeight || '1.6';
+        if (currentLineHeight === '1.6') {
+          editor.style.lineHeight = '2.5';
+          lineSpacingBtn.classList.add('active');
+        } else {
+          editor.style.lineHeight = '1.6';
+          lineSpacingBtn.classList.remove('active');
+        }
+        state.editorLineHeight = editor.style.lineHeight;
+        save();
+      });
+      lineSpacingBtn.addEventListener('mousedown', (e) => e.preventDefault());
     }
 
     // Link button
