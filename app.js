@@ -1709,6 +1709,12 @@
 
     if (editorEl && ctxMenu) {
       editorEl.addEventListener('contextmenu', (e) => {
+        const tableCell = e.target.closest('td, th');
+        if (!tableCell) {
+          // Normal text: let native browser context menu handle spelling/copy/paste
+          return;
+        }
+
         e.preventDefault();
         const sel = window.getSelection();
         if (sel && !sel.isCollapsed) {
@@ -1718,10 +1724,10 @@
           ctxSavedRange = null;
         }
 
-        ctxCurrentTableCell = e.target.closest('td, th');
+        ctxCurrentTableCell = tableCell;
         const tableControls = ctxMenu.querySelectorAll('.table-control');
         tableControls.forEach(ctrl => {
-          ctrl.style.display = ctxCurrentTableCell ? 'block' : 'none';
+          ctrl.style.display = 'flex'; // Use flex for ctx-menu-item
         });
 
         ctxMenu.hidden = false;
@@ -1729,8 +1735,8 @@
         let x = e.clientX;
         let y = e.clientY;
         // Prevent going off screen
-        const menuW = ctxMenu.offsetWidth;
-        const menuH = ctxMenu.offsetHeight;
+        const menuW = 180;
+        const menuH = 200;
         if (x + menuW > window.innerWidth) x = window.innerWidth - menuW - 8;
         if (y + menuH > window.innerHeight) y = window.innerHeight - menuH - 8;
         ctxMenu.style.left = x + 'px';
@@ -1874,7 +1880,9 @@
       fontSizeSlider.addEventListener('input', (e) => {
         const size = e.target.value;
         editor.style.fontSize = `${size}px`;
-        state.editorFontSize = size;
+      });
+      fontSizeSlider.addEventListener('change', (e) => {
+        state.editorFontSize = e.target.value;
         save();
       });
     }
@@ -1891,12 +1899,31 @@
     // Color button & picker
     const colorBtn = $('#colorBtn');
     const colorPicker = $('#colorPicker');
+    let savedColorSelection = null;
+    
+    colorBtn.addEventListener('mousedown', (e) => {
+      // Prevent focus loss when clicking the button
+      e.preventDefault();
+    });
+    
     colorBtn.addEventListener('click', (e) => {
       e.preventDefault();
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount > 0 && !sel.isCollapsed) {
+        savedColorSelection = sel.getRangeAt(0).cloneRange();
+      } else {
+        savedColorSelection = null;
+      }
       colorPicker.click();
     });
+    
     colorPicker.addEventListener('input', (e) => {
-      execFormat('foreColor', e.target.value);
+      if (savedColorSelection) {
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(savedColorSelection);
+      }
+      document.execCommand('foreColor', false, e.target.value);
     });
 
     // Cover image — click to upload

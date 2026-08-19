@@ -639,14 +639,15 @@ body {
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 8px 24px;
-  border-bottom: 1px solid var(--glass-border);
-  background: rgba(20, 20, 30, 0.85);
-  backdrop-filter: var(--blur-md);
-  -webkit-backdrop-filter: var(--blur-md);
+  padding: 8px 16px;
+  margin: 16px 24px;
+  border: 1px solid var(--glass-border);
+  background: var(--bg-elevated);
+  border-radius: var(--radius-pill);
+  box-shadow: var(--shadow-sm);
   flex-wrap: wrap;
   position: sticky;
-  top: 0;
+  top: 16px;
   z-index: 15;
   box-shadow: 0 4px 12px rgba(0,0,0,0.2);
 }
