@@ -1735,17 +1735,19 @@
           ctxSavedRange = null;
         }
 
-        const tableCell = e.target.closest('td, th');
-        if (!tableCell) {
-          return;
-        }
-
+        // Always show our custom menu, not just for tables!
         e.preventDefault();
 
-        ctxCurrentTableCell = tableCell;
+        // If it's a table cell, save it for table-specific operations
+        const tableCell = e.target.closest('td, th');
+        if (tableCell) {
+          ctxCurrentTableCell = tableCell;
+        } else {
+          ctxCurrentTableCell = null;
+        }
         const tableControls = ctxMenu.querySelectorAll('.table-control');
         tableControls.forEach(ctrl => {
-          ctrl.style.display = 'flex'; // Use flex for ctx-menu-item
+          ctrl.style.display = tableCell ? 'flex' : 'none'; // Use flex for ctx-menu-item
         });
 
         ctxMenu.hidden = false;
@@ -2531,6 +2533,8 @@
 
     // Listen for native context menu actions from main process
     ipcRenderer.on('context-menu-action', (event, action) => {
+      alert("IPC RECEIVED: " + action);
+      
       // Debug toast to ensure IPC works
       if (typeof showToast === 'function') {
         showToast('Action received: ' + action, 'success');

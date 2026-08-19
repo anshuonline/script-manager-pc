@@ -20,6 +20,7 @@ function createWindow() {
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false,
+      backgroundThrottling: false
     },
     // Frameless with custom titlebar feel — but keep native controls
     titleBarStyle: 'default',
@@ -80,19 +81,19 @@ function createWindow() {
       if (selectionText && selectionText.trim() !== '') {
         template.push({
           label: 'Make Part',
-          click: () => mainWindow.webContents.send('context-menu-action', 'make-part')
+          click: () => event.sender.send('context-menu-action', 'make-part')
         });
         template.push({
           label: 'Highlight Yellow',
-          click: () => mainWindow.webContents.send('context-menu-action', 'highlight')
+          click: () => event.sender.send('context-menu-action', 'highlight')
         });
         template.push({
           label: 'Toggle Case',
-          click: () => mainWindow.webContents.send('context-menu-action', 'case-toggle')
+          click: () => event.sender.send('context-menu-action', 'case-toggle')
         });
         template.push({
           label: 'Clear Formatting',
-          click: () => mainWindow.webContents.send('context-menu-action', 'clear-format')
+          click: () => event.sender.send('context-menu-action', 'clear-format')
         });
         template.push({ type: 'separator' });
       }
