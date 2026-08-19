@@ -4,8 +4,15 @@
 
 (function () {
   'use strict';
+  
+  // GLOBAL CRASH LOGGER
+  window.addEventListener('error', (e) => {
+    alert("CRASH: " + (e.error ? e.error.stack : e.message));
+  });
+  window.addEventListener('unhandledrejection', (e) => {
+    alert("PROMISE CRASH: " + (e.reason ? (e.reason.stack || e.reason) : "Unknown"));
+  });
 
-  // ── Constants ──────────────────────────────────────────────
   const STORAGE_KEY = 'scriptManagerData';
   const MAX_IMAGE_WIDTH = 1200;
   const MAX_IMAGE_HEIGHT = 800;
@@ -3572,9 +3579,14 @@
   });
 
   document.addEventListener('DOMContentLoaded', () => {
-    init();
-    setupToolsSidebar();
-    setupStatsDropdowns();
-    initRipples();
+    try {
+      init();
+      setupToolsSidebar();
+      setupStatsDropdowns();
+      initRipples();
+    } catch (err) {
+      fs.writeFileSync('CRASH_REPORT.txt', err.stack || err.message || err.toString());
+      alert('App crashed! See CRASH_REPORT.txt');
+    }
   });
 })();
