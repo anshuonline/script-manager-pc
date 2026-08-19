@@ -1937,7 +1937,7 @@
     // Custom color picker
     const customColorInput = $('#customColorPicker');
     if (customColorInput) {
-      customColorInput.addEventListener('input', (e) => {
+      customColorInput.addEventListener('change', (e) => {
         if (savedColorSelection) {
           const sel = window.getSelection();
           sel.removeAllRanges();
@@ -1945,8 +1945,6 @@
         }
         document.execCommand('foreColor', false, e.target.value);
         colorIndicator.style.background = e.target.value;
-      });
-      customColorInput.addEventListener('change', () => {
         colorPalette.hidden = true;
       });
     }
