@@ -755,6 +755,40 @@ body {
   border-top: 1px solid var(--glass-border);
 }
 
+.custom-color-wrapper {
+  margin-bottom: 8px;
+  position: relative;
+}
+
+.custom-color-btn {
+  display: block;
+  width: 100%;
+  padding: 8px 0;
+  background: var(--glass-1);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 13px;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.15s ease;
+}
+
+.custom-color-btn:hover {
+  background: var(--glass-2);
+  border-color: var(--accent);
+}
+
+.custom-color-input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  padding: 0;
+  margin: 0;
+  border: none;
+}
+
 .color-remove-btn {
   width: 100%;
   padding: 6px 0;
