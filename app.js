@@ -2518,46 +2518,41 @@
 
     // Listen for native context menu actions from main process
     ipcRenderer.on('context-menu-action', (event, action) => {
-      // Must focus the editor first for execCommand to work
-      const editorEl = $('#editor');
-      if (editorEl) editorEl.focus();
+      setTimeout(() => {
+        const editorEl = $('#editor');
+        if (editorEl) editorEl.focus();
 
-      // Restore selection if saved
-      if (ctxSavedRange) {
-        const sel = window.getSelection();
-        sel.removeAllRanges();
-        sel.addRange(ctxSavedRange);
-      }
-
-      switch (action) {
-        case 'make-part':
-          createPartFromSelection();
-          break;
-        case 'insert-broll':
-          document.execCommand('insertText', false, '[B-ROLL]');
-          // Note: previous implementation used insertBRollMarker, let's call that if it exists
-          if (typeof insertBRollMarker === 'function') {
-             // Rollback text insertion and use proper function
-             document.execCommand('undo');
-             insertBRollMarker();
-          }
-          break;
-        case 'highlight':
-          document.execCommand('backColor', false, 'yellow');
-          break;
-        case 'case-toggle':
+        if (ctxSavedRange) {
           const sel = window.getSelection();
-          if (sel && sel.rangeCount > 0 && !sel.isCollapsed) {
-            const text = sel.toString();
-            const isUpper = text === text.toUpperCase();
-            const newText = isUpper ? text.toLowerCase() : text.toUpperCase();
-            document.execCommand('insertText', false, newText);
+          sel.removeAllRanges();
+          sel.addRange(ctxSavedRange);
+        }
+
+        switch (action) {
+          case 'make-part':
+            createPartFromSelection();
+            break;
+          case 'insert-broll':
+            document.execCommand('insertText', false, '[B-ROLL]');
+            break;
+          case 'highlight':
+            document.execCommand('backColor', false, 'yellow');
+            break;
+          case 'case-toggle': {
+            const currentSel = window.getSelection();
+            if (currentSel && currentSel.rangeCount > 0 && !currentSel.isCollapsed) {
+              const text = currentSel.toString();
+              const isUpper = text === text.toUpperCase();
+              const newText = isUpper ? text.toLowerCase() : text.toUpperCase();
+              document.execCommand('insertText', false, newText);
+            }
+            break;
           }
-          break;
-        case 'clear-format':
-          document.execCommand('removeFormat');
-          break;
-      }
+          case 'clear-format':
+            document.execCommand('removeFormat');
+            break;
+        }
+      }, 50);
     });
 
     window.activePartItemContextMenu = null;
