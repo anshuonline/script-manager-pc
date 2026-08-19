@@ -1896,34 +1896,64 @@
     // Save link
     $('#saveLinkBtn').addEventListener('click', applyLink);
 
-    // Color button & picker
+    // Color palette popup
     const colorBtn = $('#colorBtn');
-    const colorPicker = $('#colorPicker');
+    const colorPalette = $('#colorPalettePopup');
+    const colorIndicator = $('#colorIndicator');
     let savedColorSelection = null;
     
     colorBtn.addEventListener('mousedown', (e) => {
-      // Prevent focus loss when clicking the button
-      e.preventDefault();
+      e.preventDefault(); // Prevent focus loss
     });
     
     colorBtn.addEventListener('click', (e) => {
       e.preventDefault();
+      e.stopPropagation();
       const sel = window.getSelection();
       if (sel && sel.rangeCount > 0 && !sel.isCollapsed) {
         savedColorSelection = sel.getRangeAt(0).cloneRange();
-      } else {
-        savedColorSelection = null;
       }
-      colorPicker.click();
+      colorPalette.hidden = !colorPalette.hidden;
     });
     
-    colorPicker.addEventListener('input', (e) => {
+    // Swatch clicks
+    colorPalette.querySelectorAll('.color-swatch').forEach(swatch => {
+      swatch.addEventListener('mousedown', (e) => e.preventDefault());
+      swatch.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const color = swatch.dataset.color;
+        if (savedColorSelection) {
+          const sel = window.getSelection();
+          sel.removeAllRanges();
+          sel.addRange(savedColorSelection);
+        }
+        document.execCommand('foreColor', false, color);
+        colorIndicator.style.background = color;
+        colorPalette.hidden = true;
+      });
+    });
+    
+    // Remove color button
+    $('#removeColorBtn').addEventListener('mousedown', (e) => e.preventDefault());
+    $('#removeColorBtn').addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
       if (savedColorSelection) {
         const sel = window.getSelection();
         sel.removeAllRanges();
         sel.addRange(savedColorSelection);
       }
-      document.execCommand('foreColor', false, e.target.value);
+      document.execCommand('removeFormat', false, null);
+      colorIndicator.style.background = '#a599ff';
+      colorPalette.hidden = true;
+    });
+    
+    // Close palette on outside click
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('.color-picker-wrapper')) {
+        colorPalette.hidden = true;
+      }
     });
 
     // Cover image — click to upload

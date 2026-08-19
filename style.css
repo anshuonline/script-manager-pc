@@ -698,6 +698,81 @@ body {
 
 .toolbar-btn-wide { min-width: 32px; font-size: 12px; }
 
+/* ── Color Palette Popup ── */
+.color-picker-wrapper {
+  position: relative;
+  display: inline-flex;
+}
+
+.color-palette-popup {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 100;
+  background: var(--bg-elevated);
+  border: 1px solid var(--glass-border-2);
+  border-radius: var(--radius-md);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.45);
+  padding: 12px;
+  min-width: 200px;
+  animation: colorPopIn 0.15s ease;
+}
+
+@keyframes colorPopIn {
+  from { opacity: 0; transform: translateY(-4px) scale(0.95); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.color-palette-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+}
+
+.color-swatch {
+  width: 30px;
+  height: 30px;
+  border: 2px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: transform 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease;
+  outline: none;
+}
+
+.color-swatch:hover {
+  transform: scale(1.15);
+  border-color: var(--accent);
+  box-shadow: 0 0 8px rgba(110,106,255,0.4);
+}
+
+.color-swatch:active {
+  transform: scale(0.95);
+}
+
+.color-palette-footer {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--glass-border);
+}
+
+.color-remove-btn {
+  width: 100%;
+  padding: 6px 0;
+  background: transparent;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.color-remove-btn:hover {
+  background: rgba(255,95,109,0.15);
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
 /* Font size slider */
 .font-size-slider {
   -webkit-appearance: none;
@@ -1923,7 +1998,13 @@ body {
   background: #000;
 }
 .teleprompter-overlay.theme-high-contrast .tp-content {
-  color: #ffff00;
+  color: #ffff00 !important;
+}
+.teleprompter-overlay.theme-high-contrast .tp-content * {
+  color: #ffff00 !important;
+}
+.teleprompter-overlay.theme-high-contrast .tp-content font[color] {
+  color: #ffff00 !important;
 }
 .teleprompter-overlay.theme-high-contrast .eyeline-mask {
   background: rgba(0,0,0,0.8);
@@ -1932,7 +2013,13 @@ body {
   background: #f4f4f5;
 }
 .teleprompter-overlay.theme-light .tp-content {
-  color: #18181b;
+  color: #18181b !important;
+}
+.teleprompter-overlay.theme-light .tp-content * {
+  color: #18181b !important;
+}
+.teleprompter-overlay.theme-light .tp-content font[color] {
+  color: #18181b !important;
 }
 .teleprompter-overlay.theme-light .eyeline-mask {
   background: rgba(255,255,255,0.7);
