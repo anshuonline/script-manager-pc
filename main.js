@@ -79,26 +79,26 @@ function createWindow() {
       
       if (selectionText && selectionText.trim() !== '') {
         template.push({
-          label: '🎬 Make Part',
+          label: 'Make Part',
           click: () => mainWindow.webContents.send('context-menu-action', 'make-part')
         });
         template.push({
-          label: '🖍️ Highlight Yellow',
+          label: 'Highlight Yellow',
           click: () => mainWindow.webContents.send('context-menu-action', 'highlight')
         });
         template.push({
-          label: 'Aa Toggle Case',
+          label: 'Toggle Case',
           click: () => mainWindow.webContents.send('context-menu-action', 'case-toggle')
         });
         template.push({
-          label: 'T✕ Clear Formatting',
+          label: 'Clear Formatting',
           click: () => mainWindow.webContents.send('context-menu-action', 'clear-format')
         });
         template.push({ type: 'separator' });
       }
       
       template.push({
-        label: '📽️ Insert B-Roll Marker',
+        label: 'Insert B-Roll Marker',
         click: () => mainWindow.webContents.send('context-menu-action', 'insert-broll')
       });
     }

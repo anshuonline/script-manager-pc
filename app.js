@@ -2517,8 +2517,11 @@
     });
 
     // Listen for native context menu actions from main process
-    const { ipcRenderer } = require('electron');
     ipcRenderer.on('context-menu-action', (event, action) => {
+      // Must focus the editor first for execCommand to work
+      const editorEl = $('#editor');
+      if (editorEl) editorEl.focus();
+
       // Restore selection if saved
       if (ctxSavedRange) {
         const sel = window.getSelection();
