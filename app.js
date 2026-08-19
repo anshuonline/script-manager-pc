@@ -2406,6 +2406,25 @@
     const tpOverlay = $('#teleprompterOverlay');
     if (tpOverlay) tpOverlay.hidden = true;
 
+    // ── What's New Popup (show once per version) ──────────────
+    const CURRENT_VERSION = '1.11.0';
+    const seenVersion = localStorage.getItem('sm_seen_version');
+    if (seenVersion !== CURRENT_VERSION) {
+      const wnModal = $('#whatsNewModal');
+      if (wnModal) {
+        setTimeout(() => { wnModal.hidden = false; }, 800);
+        const closeWN = () => {
+          wnModal.hidden = true;
+          localStorage.setItem('sm_seen_version', CURRENT_VERSION);
+        };
+        $('#whatsNewCloseBtn').addEventListener('click', closeWN);
+        $('#whatsNewGotItBtn').addEventListener('click', closeWN);
+        wnModal.addEventListener('click', (e) => {
+          if (e.target === wnModal) closeWN();
+        });
+      }
+    }
+
     // Listen for remote teleprompter commands from mobile app
     window.addEventListener('teleprompter-remote', (e) => {
       const { action, value } = e.detail;

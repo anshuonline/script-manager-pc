@@ -1,6 +1,6 @@
 {
   "name": "script-manager",
-  "version": "1.10.0",
+  "version": "1.11.0",
   "description": "A premium dark-mode app to organize video scripts, thumbnails, and schedule publish dates.",
   "main": "main.js",
   "scripts": {
