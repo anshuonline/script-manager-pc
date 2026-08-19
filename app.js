@@ -66,6 +66,9 @@
   let tpExactScrollTop = 0;
   let savedSelectionRange = null;
   let serverIP = '';
+  
+  let ctxSavedRange = null;
+  let ctxCurrentTableCell = null;
 
   // ── DOM Helpers ────────────────────────────────────────────
   const $ = (sel) => document.querySelector(sel);
@@ -1654,8 +1657,6 @@
     // ── Custom Context Menu ──────────────────────────────────
     const ctxMenu = $('#editorContextMenu');
     const editorEl = $('#editor');
-    let ctxSavedRange = null;
-    let ctxCurrentTableCell = null;
     const PART_COLORS = ['#6e6aff', '#ff9f43', '#2ed573', '#ff6b81', '#1e90ff'];
 
     function hideContextMenu() {
