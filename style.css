@@ -926,6 +926,10 @@ body {
   position: relative;
 }
 
+.editor-content * {
+  outline: none !important;
+}
+
 .editor-content:empty::before {
   content: attr(data-placeholder);
   color: var(--text-placeholder);
