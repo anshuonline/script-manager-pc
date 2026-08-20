@@ -70,6 +70,61 @@
   --ease:        cubic-bezier(0.2, 0.8, 0.2, 1);
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
   --ease-out:    cubic-bezier(0, 0, 0.2, 1);
+
+  /* Motion durations (consistent pacing across the app) */
+  --dur-fast: 0.15s;
+  --dur-base: 0.2s;
+  --dur-slow: 0.3s;
+
+  /* Blur scale — was referenced throughout but never declared */
+  --blur-sm: blur(8px);
+  --blur-md: blur(16px);
+  --blur-lg: blur(24px);
+  --blur-xl: blur(32px);
+
+  /* Aliases used elsewhere in the sheet */
+  --primary:   var(--accent);
+  --accent-1:  var(--accent);
+
+  /* Spacing scale for consistent rhythm */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+
+  /* Focus ring — one definition, used everywhere */
+  --focus-ring: 0 0 0 3px var(--accent-glow);
+
+  /* Floating surfaces (toolbar, HUD, popovers) that sit above everything */
+  --surface-floating: rgba(22,22,32,0.75);
+  --surface-floating-border: rgba(255,255,255,0.08);
+  --scrollbar-thumb: rgba(255,255,255,0.1);
+  --scrollbar-thumb-hover: rgba(255,255,255,0.18);
+}
+
+/* Respect users who've asked the OS to minimize motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Consistent, visible keyboard focus across every interactive element */
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible,
+.editor-content:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-xs);
 }
 
 body.light-mode {
@@ -104,7 +159,16 @@ body.light-mode {
   --shadow-md:  0px 8px 24px rgba(0,0,0,0.08);
   --shadow-lg:  0px 12px 32px rgba(0,0,0,0.1);
   --shadow-xl:  0px 24px 64px rgba(0,0,0,0.15);
+
+  /* Surfaces that were hardcoded to dark rgba throughout the sheet */
+  --surface-floating: rgba(255,255,255,0.9);
+  --surface-floating-border: rgba(0,0,0,0.08);
+  --scrollbar-thumb: rgba(0,0,0,0.15);
+  --scrollbar-thumb-hover: rgba(0,0,0,0.25);
 }
+
+body.light-mode ::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); }
+body.light-mode ::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-thumb-hover); }
 
 /* ==============================
    Reset & Base
@@ -134,13 +198,14 @@ body {
 /* ==============================
    Custom Scrollbar
    ============================== */
+* { scrollbar-width: thin; scrollbar-color: var(--scrollbar-thumb) transparent; }
 ::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-  background: rgba(255,255,255,0.1);
+  background: var(--scrollbar-thumb);
   border-radius: 10px;
 }
-::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.18); }
+::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-thumb-hover); }
 
 /* ==============================
    3-Pane Layout System
@@ -390,7 +455,7 @@ body {
 }
 
 .script-item.active {
-  background: rgba(255,255,255,0.06);
+  background: var(--glass-3);
   border-color: var(--accent);
   box-shadow: 0 4px 12px var(--accent-glow);
 }
@@ -645,7 +710,7 @@ body {
 }
 
 .status-select option {
-  background: #1e1e24;
+  background: var(--bg-elevated);
   color: var(--text-primary);
 }
 
@@ -653,23 +718,22 @@ body {
 .editor-toolbar {
   display: flex;
   align-items: center;
-  justify-content: center;
   gap: 8px;
   padding: 8px 12px;
-  margin: 0 24px 24px 24px;
-  border: 1px solid rgba(255,255,255,0.08);
-  background: rgba(22, 22, 32, 0.75);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
+  margin: 0 40px 24px 40px;
+  border: 1px solid var(--surface-floating-border);
+  background: var(--surface-floating);
+  backdrop-filter: var(--blur-lg);
+  -webkit-backdrop-filter: var(--blur-lg);
   border-radius: 16px;
   position: sticky;
   top: 24px;
   z-index: 15;
-  box-shadow: 
-    0 16px 40px rgba(0,0,0,0.4), 
+  box-shadow:
+    var(--shadow-lg),
     inset 0 1px 0 rgba(255,255,255,0.05);
   flex-wrap: wrap;
-  transition: all 0.3s ease;
+  transition: box-shadow var(--dur-slow) var(--ease), transform var(--dur-slow) var(--ease);
 }
 
 .toolbar-group {
@@ -996,8 +1060,7 @@ body {
   flex-direction: row;
   height: 100%;
   width: 100%;
-  overflow-x: auto;
-  overflow-y: hidden;
+  overflow: hidden;
 }
 
 .editor-main-column {
@@ -1006,7 +1069,6 @@ body {
   flex-direction: column;
   overflow-y: auto;
   position: relative;
-  min-width: 400px;
 }
 
 /* Parts Sidebar */
@@ -1229,7 +1291,23 @@ body {
   font-size: 11px;
   color: var(--text-muted);
   border-top: 1px solid var(--glass-border);
-  background: rgba(10,10,16,0.4);
+  background: var(--glass-1);
+}
+
+/* ── Disabled state (shared across every button variant) ── */
+.btn-primary:disabled,
+.btn-secondary:disabled,
+.btn-icon:disabled,
+.btn-danger:disabled,
+.btn-danger-solid:disabled,
+.toolbar-btn:disabled,
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  pointer-events: none;
+  transform: none !important;
+  filter: none !important;
+  box-shadow: none !important;
 }
 
 /* ==============================
@@ -1343,7 +1421,7 @@ body {
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
 .modal {
-  background: rgba(20,20,32,0.9);
+  background: var(--surface-floating);
   backdrop-filter: var(--blur-xl);
   -webkit-backdrop-filter: var(--blur-xl);
   border: 1px solid var(--glass-border-2);
@@ -1408,7 +1486,7 @@ body {
   padding: 10px 14px;
   outline: none;
   transition: border-color 0.18s var(--ease);
-  color-scheme: dark;
+  color-scheme: light dark;
 }
 
 .date-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(110,106,255,0.15); }
@@ -1451,7 +1529,7 @@ body {
   align-items: center;
   gap: 10px;
   padding: 11px 16px;
-  background: rgba(22,22,36,0.92);
+  background: var(--surface-floating);
   backdrop-filter: var(--blur-lg);
   -webkit-backdrop-filter: var(--blur-lg);
   border: 1px solid var(--glass-border-2);
@@ -1862,18 +1940,6 @@ body {
   color: #fff;
 }
 
-.tphud-time {
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  color: #fff;
-}
-
-.tphud-eta {
-  font-size: 13px;
-  color: #a1a1aa;
-  font-variant-numeric: tabular-nums;
-}
-
 .tphud-fab {
   position: absolute;
   bottom: 40px;
@@ -2128,7 +2194,7 @@ body {
   top: 10px;
   right: 20px;
   width: 320px;
-  background: rgba(18,18,28,0.92);
+  background: var(--surface-floating);
   backdrop-filter: var(--blur-xl);
   -webkit-backdrop-filter: var(--blur-xl);
   border: 1px solid var(--glass-border-2);
@@ -2993,4 +3059,3 @@ body {
 .whats-new-cta:active {
   transform: translateY(0);
 }
-
