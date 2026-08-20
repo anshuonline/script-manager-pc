@@ -3382,7 +3382,7 @@ button:disabled {
   background: var(--bg-elevated);
   border: 1px solid var(--glass-border-2);
   border-radius: 20px;
-  width: 520px;
+  width: 580px;
   max-width: 95vw;
   max-height: 88vh;
   display: flex;

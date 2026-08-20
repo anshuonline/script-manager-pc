@@ -33,6 +33,13 @@
         </button>
       </div>
       <div class="rail-bottom">
+        <button id="whatsNewRailBtn" class="rail-tab" title="What's New (Changelog)">
+          <span class="rail-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 3l1.912 5.813a2 2 0 001.272 1.272L21 12l-5.813 1.912a2 2 0 00-1.272 1.272L12 21l-1.912-5.813a2 2 0 00-1.272-1.272L3 12l5.813-1.912a2 2 0 001.272-1.272L12 3z"></path>
+            </svg>
+          </span>
+        </button>
       </div>
     </nav>
 
@@ -969,47 +976,54 @@
   <div id="whatsNewModal" class="whats-new-overlay" hidden>
     <div class="whats-new-dialog">
       <div class="whats-new-header">
-        <div class="whats-new-badge">NEW</div>
+        <div class="whats-new-badge">v1.12.0</div>
         <div>
           <h2 class="whats-new-title">What's New in Script Manager</h2>
-          <p class="whats-new-version">Version 1.11.0 — August 2026</p>
+          <p class="whats-new-version">Version 1.12.0 — Major Update (August 2026)</p>
         </div>
         <button id="whatsNewCloseBtn" class="whats-new-close">✕</button>
       </div>
       <div class="whats-new-body">
         <div class="wn-section">
+          <div class="wn-section-icon">💾</div>
+          <div class="wn-section-content">
+            <h3>Automatic Backup & System Tray Execution</h3>
+            <p>App bandh hone par ab auto-backup nahi rukega! Window close karne par app <b>System Tray</b> mein minimize ho jata hai aur background mein aapka data automatically configured frequency (1 Hr, 6 Hrs, Daily) par safe folder mein backup karta rehta hai. PC storage ko safe rakhne ke liye sirf <b>latest 5 auto-backups</b> hi manage hote hain.</p>
+          </div>
+        </div>
+        <div class="wn-section">
+          <div class="wn-section-icon">🏷️</div>
+          <div class="wn-section-content">
+            <h3>Customizable Script Part Names</h3>
+            <p>Right-click karke <b>"Make Part"</b> select karne par ab aap script parts ko apna manpasand custom naam de sakte hain (jaise <i>"Intro"</i>, <i>"Scene 1"</i>, <i>"Outro"</i>) instead of default numbers.</p>
+          </div>
+        </div>
+        <div class="wn-section">
           <div class="wn-section-icon">🎨</div>
           <div class="wn-section-content">
-            <h3>New Color Palette</h3>
-            <p>Text color picker ab ek beautiful popup palette hai — 20 preset colors with instant apply. Koi lag nahi, koi corner mein khulne wala dialog nahi!</p>
+            <h3>Editor Focus & Paste Outlines Fixed</h3>
+            <p>ChatGPT ya kisi bhi site se copy-paste kiye hue elements par aane wale blue/grey borders aur editor focus rings ko strictly remove kar diya gaya hai for a completely clean dark writing experience.</p>
           </div>
         </div>
         <div class="wn-section">
-          <div class="wn-section-icon">🎭</div>
+          <div class="wn-section-icon">📅</div>
           <div class="wn-section-content">
-            <h3>Character Management System</h3>
-            <p>Hollywood-style character system directly right sidebar mein! Biodata, relationships, aur Node Graph — sab kuch script ke sath linked.</p>
-          </div>
-        </div>
-        <div class="wn-section">
-          <div class="wn-section-icon">📽️</div>
-          <div class="wn-section-content">
-            <h3>Teleprompter Forced Colors</h3>
-            <p>Light aur High Contrast mode mein ab text ka color force ho jata hai — chahe editor mein koi bhi color lagaya ho. Perfect readability guaranteed.</p>
-          </div>
-        </div>
-        <div class="wn-section">
-          <div class="wn-section-icon">🖱️</div>
-          <div class="wn-section-content">
-            <h3>Right Click Fixed</h3>
-            <p>Editor mein ab normal right-click pe browser ka native menu khulta hai (Copy, Paste, Spell Check). Table par right-click pe table controls milte hain.</p>
+            <h3>Industry-Level Glass Calendar & Smart Filtering</h3>
+            <p>Calendar view ab glassmorphism UI mein upgraded hai. Quick <b>"Today"</b> jump button, accurate local timezone logic, aur finished/published scripts ka upcoming schedule se automatic removal.</p>
           </div>
         </div>
         <div class="wn-section">
           <div class="wn-section-icon">⚡</div>
           <div class="wn-section-content">
-            <h3>Performance Improvements</h3>
-            <p>Font size slider ab smooth aur lag-free hai. Toolbar ka new floating pill design themed aur premium dikh raha hai.</p>
+            <h3>Fast Event-Delegated Context Menu</h3>
+            <p>Standalone fast context menu with Text Highlight, Case Toggle, Clear Formatting, Table Insert/Delete, and Part creation.</p>
+          </div>
+        </div>
+        <div class="wn-section">
+          <div class="wn-section-icon">🎭</div>
+          <div class="wn-section-content">
+            <h3>Hollywood Character Management & Visual Network Graph</h3>
+            <p>Editor mein <b>@mention</b> character system, interactive network graph, character relationship linking, aur detailed character profile cards.</p>
           </div>
         </div>
       </div>

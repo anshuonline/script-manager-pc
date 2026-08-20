@@ -2314,23 +2314,29 @@
     const tpOverlay = $('#teleprompterOverlay');
     if (tpOverlay) tpOverlay.hidden = true;
 
-    // ── What's New Popup (show once per version) ──────────────
-    const CURRENT_VERSION = '1.11.0';
-    const seenVersion = localStorage.getItem('sm_seen_version');
-    if (seenVersion !== CURRENT_VERSION) {
-      const wnModal = $('#whatsNewModal');
-      if (wnModal) {
+    // ── What's New Popup (show once per version + on rail button click) ──────────────
+    const CURRENT_VERSION = '1.12.0';
+    const wnModal = $('#whatsNewModal');
+    if (wnModal) {
+      const closeWN = () => {
+        wnModal.hidden = true;
+        localStorage.setItem('sm_seen_version', CURRENT_VERSION);
+      };
+      $('#whatsNewCloseBtn')?.addEventListener('click', closeWN);
+      $('#whatsNewGotItBtn')?.addEventListener('click', closeWN);
+      wnModal.addEventListener('click', (e) => {
+        if (e.target === wnModal) closeWN();
+      });
+
+      const seenVersion = localStorage.getItem('sm_seen_version');
+      if (seenVersion !== CURRENT_VERSION) {
         setTimeout(() => { wnModal.hidden = false; }, 800);
-        const closeWN = () => {
-          wnModal.hidden = true;
-          localStorage.setItem('sm_seen_version', CURRENT_VERSION);
-        };
-        $('#whatsNewCloseBtn').addEventListener('click', closeWN);
-        $('#whatsNewGotItBtn').addEventListener('click', closeWN);
-        wnModal.addEventListener('click', (e) => {
-          if (e.target === wnModal) closeWN();
-        });
       }
+
+      // Rail icon button click to open What's New anytime
+      $('#whatsNewRailBtn')?.addEventListener('click', () => {
+        wnModal.hidden = false;
+      });
     }
 
     // Listen for remote teleprompter commands from mobile app
