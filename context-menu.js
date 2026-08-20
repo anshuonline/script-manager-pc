@@ -438,15 +438,40 @@
     wrapper.setAttribute('data-part-name', name);
     wrapper.setAttribute('data-part-color', String(colorIndex + 1));
 
-    try {
-      range.surroundContents(wrapper);
-    } catch (_err) {
-      // surroundContents fails if the selection crosses element boundaries,
-      // fall back to extracting and re-inserting
-      const fragment = range.extractContents();
-      wrapper.appendChild(fragment);
-      range.insertNode(wrapper);
+    // Extract selected content
+    const fragment = range.extractContents();
+    
+    // If the extracted fragment is just text, wrap it in a <p> so it formats nicely inside the part.
+    // If it already has block elements, we leave it as is.
+    const tempDiv = document.createElement('div');
+    tempDiv.appendChild(fragment);
+    
+    if (tempDiv.innerHTML.trim() !== '') {
+       let hasBlock = false;
+       for (let i = 0; i < tempDiv.childNodes.length; i++) {
+         const node = tempDiv.childNodes[i];
+         if (node.nodeType === 1) { // Element node
+           const tag = node.tagName.toLowerCase();
+           if (['p', 'div', 'h1', 'h2', 'h3', 'blockquote', 'ul', 'ol', 'li', 'table'].includes(tag)) {
+             hasBlock = true;
+             break;
+           }
+         }
+       }
+       if (!hasBlock) {
+         const p = document.createElement('p');
+         p.innerHTML = tempDiv.innerHTML;
+         wrapper.appendChild(p);
+       } else {
+         wrapper.innerHTML = tempDiv.innerHTML;
+       }
+    } else {
+       wrapper.innerHTML = '<p><br></p>';
     }
+
+    // Insert cleanly via insertHTML so the browser fixes invalid nesting (e.g. div inside p)
+    const htmlString = wrapper.outerHTML;
+    document.execCommand('insertHTML', false, htmlString);
 
     sel.removeAllRanges();
 
