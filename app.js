@@ -593,11 +593,10 @@
     if (!container) return;
 
     const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const todayStr = today.toISOString().slice(0, 10);
+    const localTodayStr = new Date(today.getTime() - (today.getTimezoneOffset() * 60000)).toISOString().slice(0, 10);
 
     const upcoming = state.scripts
-      .filter((s) => s.publishDate && s.publishDate >= todayStr)
+      .filter((s) => s.publishDate && s.publishDate >= localTodayStr && s.status !== 'finished' && s.status !== 'published')
       .sort((a, b) => a.publishDate.localeCompare(b.publishDate));
 
     if (upcoming.length === 0) {
