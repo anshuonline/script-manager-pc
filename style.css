@@ -667,8 +667,14 @@ body {
   box-shadow: 
     0 16px 40px rgba(0,0,0,0.4), 
     inset 0 1px 0 rgba(255,255,255,0.05);
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  overflow-x: auto;
   transition: all 0.3s ease;
+}
+
+/* Hide scrollbar for toolbar but allow scrolling */
+.editor-toolbar::-webkit-scrollbar {
+  display: none;
 }
 
 .toolbar-group {
@@ -995,7 +1001,8 @@ body {
   flex-direction: row;
   height: 100%;
   width: 100%;
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
 }
 
 .editor-main-column {
@@ -1004,6 +1011,7 @@ body {
   flex-direction: column;
   overflow-y: auto;
   position: relative;
+  min-width: 400px;
 }
 
 /* Parts Sidebar */
