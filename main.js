@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, ipcMain, shell, dialog } = require('electron');
+const { app, BrowserWindow, Menu, ipcMain, shell, dialog, Tray } = require('electron');
 const path = require('path');
 const os = require('os');
 const fs = require('fs');
@@ -7,6 +7,8 @@ const JSZip = require('jszip');
 
 // Keep a global reference to prevent garbage collection
 let mainWindow;
+let tray = null;
+let isQuitting = false;
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -54,6 +56,13 @@ function createWindow() {
     mainWindow.webContents.send('server-ip', ip);
   });
 
+  mainWindow.on('close', (event) => {
+    if (!isQuitting) {
+      event.preventDefault();
+      mainWindow.hide();
+    }
+  });
+
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
@@ -98,6 +107,72 @@ ipcMain.handle('create-backup', async (event, stateData) => {
     return { success: true };
   } catch (err) {
     console.error('Backup Error:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+// ── Auto Backup Handlers ──
+ipcMain.handle('select-backup-folder', async () => {
+  const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
+    title: 'Select Auto Backup Folder',
+    properties: ['openDirectory']
+  });
+  if (canceled || filePaths.length === 0) return null;
+  return filePaths[0];
+});
+
+ipcMain.handle('create-auto-backup', async (event, { stateData, folderPath }) => {
+  try {
+    if (!fs.existsSync(folderPath)) {
+      return { success: false, error: 'Backup folder does not exist.' };
+    }
+
+    const zip = new JSZip();
+    zip.file('data.json', JSON.stringify(stateData));
+    
+    // Include images from the user's data folder
+    const userDataPath = path.join(process.env.APPDATA || process.env.USERPROFILE, 'ScriptManagerData');
+    if (fs.existsSync(userDataPath)) {
+      const files = fs.readdirSync(userDataPath);
+      for (const file of files) {
+        if (file.endsWith('.jpg') || file.endsWith('.png') || file.endsWith('.jpeg')) {
+          const content = fs.readFileSync(path.join(userDataPath, file));
+          zip.file(file, content);
+        }
+      }
+    }
+
+    const content = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE', compressionOptions: { level: 9 } });
+    
+    // Create timestamped filename
+    const now = new Date();
+    const pad = (n) => n.toString().padStart(2, '0');
+    const timestamp = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}_${pad(now.getHours())}-${pad(now.getMinutes())}`;
+    const filename = `ScriptManager_AutoBackup_${timestamp}.smbackup`;
+    const filePath = path.join(folderPath, filename);
+    
+    fs.writeFileSync(filePath, content);
+
+    // Keep only the latest 5 auto backups in this folder
+    try {
+      const allFiles = fs.readdirSync(folderPath);
+      const backupFiles = allFiles
+        .filter(f => f.startsWith('ScriptManager_AutoBackup_') && f.endsWith('.smbackup'))
+        .map(f => ({ name: f, path: path.join(folderPath, f), time: fs.statSync(path.join(folderPath, f)).mtime.getTime() }))
+        .sort((a, b) => b.time - a.time); // newest first
+        
+      if (backupFiles.length > 5) {
+        for (let i = 5; i < backupFiles.length; i++) {
+          fs.unlinkSync(backupFiles[i].path);
+        }
+      }
+    } catch (cleanupErr) {
+      console.error('Failed to clean up old backups:', cleanupErr);
+    }
+
+    return { success: true, filePath };
+  } catch (err) {
+    console.error('Auto Backup Error:', err);
     return { success: false, error: err.message };
   }
 });
@@ -187,11 +262,36 @@ ipcMain.on('print-to-pdf', async (event, title) => {
 // Explicitly set the App User Model ID so Windows Taskbar pins remain across updates
 app.setAppUserModelId("com.scriptmanager.app");
 
-app.whenReady().then(createWindow);
+app.whenReady().then(() => {
+  createWindow();
+
+  tray = new Tray(path.join(__dirname, 'icon1.ico'));
+  const contextMenu = Menu.buildFromTemplate([
+    { label: 'Show App', click: () => { if (mainWindow) mainWindow.show(); } },
+    { type: 'separator' },
+    { label: 'Quit', click: () => { 
+        isQuitting = true; 
+        app.quit(); 
+      } 
+    }
+  ]);
+  tray.setToolTip('Script Manager');
+  tray.setContextMenu(contextMenu);
+  
+  tray.on('double-click', () => {
+    if (mainWindow) mainWindow.show();
+  });
+});
+
+app.on('before-quit', () => {
+  isQuitting = true;
+  stopSyncServer();
+});
 
 app.on('window-all-closed', () => {
-  stopSyncServer();
-  app.quit();
+  if (isQuitting) {
+    app.quit();
+  }
 });
 
 app.on('activate', () => {

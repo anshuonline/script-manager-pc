@@ -40,6 +40,11 @@
     editorFontSize: 15,
     editorLineHeight: '1.6',
     sidebarWidth: 260,
+    autoBackup: {
+      enabled: false,
+      frequency: 60,
+      folderPath: null
+    },
     tpSpeed: 0.5,
     tpMargin: 15,
     tpLineHeight: 1.6,
@@ -111,7 +116,10 @@
         theme: state.theme,
         editorFontSize: state.editorFontSize,
         editorLineHeight: state.editorLineHeight,
-        sidebarWidth: state.sidebarWidth
+        sidebarWidth: state.sidebarWidth,
+        autoBackup: state.autoBackup,
+        tpShortcuts: state.tpShortcuts,
+        characters: state.characters
       };
       fs.writeFileSync(DATA_FILE, JSON.stringify(data), 'utf8');
     } catch (e) {
@@ -157,10 +165,57 @@
           state.activeScriptId = state.scripts[0].id;
         }
       }
+      
+      // Initialize Auto Backup after state is loaded
+      initAutoBackup();
+      
     } catch (e) {
       console.error('Failed to load data:', e);
       state.scripts = [];
     }
+  }
+
+  // ── Auto Backup ───────────────────────────────────────────
+  let autoBackupTimer = null;
+
+  function initAutoBackup() {
+    if (autoBackupTimer) {
+      clearInterval(autoBackupTimer);
+      autoBackupTimer = null;
+    }
+
+    if (!state.autoBackup || !state.autoBackup.enabled || !state.autoBackup.folderPath) {
+      return;
+    }
+
+    const freqMs = state.autoBackup.frequency * 60 * 1000;
+    console.log(`[Auto Backup] Started. Frequency: ${state.autoBackup.frequency} mins. Folder: ${state.autoBackup.folderPath}`);
+    
+    autoBackupTimer = setInterval(async () => {
+      console.log('[Auto Backup] Triggering auto backup...');
+      try {
+        const result = await ipcRenderer.invoke('create-auto-backup', {
+          stateData: { 
+            scripts: state.scripts,
+            theme: state.theme,
+            editorFontSize: state.editorFontSize,
+            editorLineHeight: state.editorLineHeight,
+            sidebarWidth: state.sidebarWidth,
+            autoBackup: state.autoBackup,
+            tpShortcuts: state.tpShortcuts,
+            characters: state.characters
+          },
+          folderPath: state.autoBackup.folderPath
+        });
+        if (result && result.success) {
+          console.log('[Auto Backup] Successfully backed up to:', result.filePath);
+        } else {
+          console.error('[Auto Backup] Failed:', result.error);
+        }
+      } catch (err) {
+        console.error('[Auto Backup] IPC error:', err);
+      }
+    }, freqMs);
   }
 
   // ── Script Operations ─────────────────────────────────────
@@ -3218,6 +3273,22 @@
     } else {
       $('#localLastBackupText').textContent = 'Never';
     }
+
+    // Auto Backup Settings Sync
+    if (!state.autoBackup) {
+      state.autoBackup = { enabled: false, frequency: 60, folderPath: null };
+    }
+    const abToggle = $('#autoBackupToggle');
+    const abFreq = $('#autoBackupFrequency');
+    const abFolderDisplay = $('#autoBackupFolderDisplay');
+    const abSettingsArea = $('#autoBackupSettingsArea');
+    if (abToggle) {
+      abToggle.checked = state.autoBackup.enabled;
+      abFreq.value = state.autoBackup.frequency.toString();
+      abFolderDisplay.textContent = state.autoBackup.folderPath || 'Not selected';
+      abFolderDisplay.title = state.autoBackup.folderPath || 'Not selected';
+      abSettingsArea.style.display = state.autoBackup.enabled ? 'grid' : 'none';
+    }
   }
 
   function showBackupOverlay(title, text) {
@@ -3231,6 +3302,48 @@
 
   $('#backupCloseBtn')?.addEventListener('click', () => {
     $('#backupProgressOverlay').style.display = 'none';
+  });
+
+  // -- Auto Backup UI Listeners --
+  $('#autoBackupToggle')?.addEventListener('change', (e) => {
+    if (!state.autoBackup) state.autoBackup = { enabled: false, frequency: 60, folderPath: null };
+    state.autoBackup.enabled = e.target.checked;
+    $('#autoBackupSettingsArea').style.display = state.autoBackup.enabled ? 'grid' : 'none';
+    save();
+    initAutoBackup();
+    if (state.autoBackup.enabled && !state.autoBackup.folderPath) {
+      showToast('Please select a backup folder', 'error');
+    } else if (state.autoBackup.enabled) {
+      showToast('Auto Backup enabled', 'success');
+    }
+  });
+
+  $('#autoBackupFrequency')?.addEventListener('change', (e) => {
+    if (!state.autoBackup) state.autoBackup = { enabled: false, frequency: 60, folderPath: null };
+    state.autoBackup.frequency = parseInt(e.target.value, 10) || 60;
+    save();
+    initAutoBackup();
+    showToast('Backup frequency updated', 'success');
+  });
+
+  $('#selectAutoBackupFolderBtn')?.addEventListener('click', async () => {
+    try {
+      const folder = await ipcRenderer.invoke('select-backup-folder');
+      if (folder) {
+        if (!state.autoBackup) state.autoBackup = { enabled: false, frequency: 60, folderPath: null };
+        state.autoBackup.folderPath = folder;
+        const disp = $('#autoBackupFolderDisplay');
+        if (disp) {
+          disp.textContent = folder;
+          disp.title = folder;
+        }
+        save();
+        initAutoBackup();
+        showToast('Backup folder set', 'success');
+      }
+    } catch (err) {
+      console.error('Failed to select folder:', err);
+    }
   });
 
   $('#createBackupBtn')?.addEventListener('click', async () => {

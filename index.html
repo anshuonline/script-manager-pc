@@ -557,6 +557,45 @@
               </div>
             </div>
 
+            <!-- Auto Backup Settings Card -->
+            <div style="background: rgba(30, 30, 42, 0.7); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.08); border-radius: 20px; padding: 32px; box-shadow: 0 16px 40px rgba(0,0,0,0.3); margin-top: -8px;">
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0;" id="autoBackupHeader">
+                <div style="display: flex; align-items: center; gap: 16px;">
+                  <div style="width: 56px; height: 56px; background: rgba(139, 92, 246, 0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 20px rgba(139, 92, 246, 0.2);">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.59-9.21l-3.25-3.25"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 style="font-size: 20px; font-weight: 700; color: #fff; margin: 0 0 4px 0;">Auto Backup</h3>
+                    <p style="font-size: 14px; color: #a1a1aa; margin: 0;">Automatically save backups in the background.</p>
+                  </div>
+                </div>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="autoBackupToggle">
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+
+              <div id="autoBackupSettingsArea" style="display: none; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 24px; margin-top: 24px; display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+                <div style="display: flex; flex-direction: column; gap: 8px;">
+                  <label style="font-size: 13px; font-weight: 600; color: #e4e4e7;">Frequency</label>
+                  <select id="autoBackupFrequency" class="premium-select">
+                    <option value="60">Every Hour</option>
+                    <option value="360">Every 6 Hours</option>
+                    <option value="1440">Daily</option>
+                  </select>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 8px;">
+                  <label style="font-size: 13px; font-weight: 600; color: #e4e4e7;">Backup Folder</label>
+                  <div style="display: flex; gap: 8px; align-items: stretch;">
+                    <button id="selectAutoBackupFolderBtn" class="btn-secondary" style="white-space: nowrap; padding: 0 16px; border-radius: 8px;">Select Folder</button>
+                    <div id="autoBackupFolderDisplay" style="flex: 1; padding: 0 12px; background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; font-size: 12px; color: #a1a1aa; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center;" title="Not selected">Not selected</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <!-- Backup Progress Overlay (Hidden by default) -->
             <div id="backupProgressOverlay" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(8, 8, 13, 0.9); backdrop-filter: blur(8px); z-index: 50; flex-direction: column; align-items: center; justify-content: center; padding: 20px;">
               <div style="width: 100%; max-width: 400px; background: rgba(30, 30, 42, 0.9); border: 1px solid rgba(59, 130, 246, 0.4); border-radius: 20px; padding: 32px; text-align: center; box-shadow: 0 20px 50px rgba(0,0,0,0.5);">
