@@ -25,6 +25,7 @@
       "index.html",
       "style.css",
       "app.js",
+      "context-menu.js",
       "sync-server.js",
       "icon1.ico",
       "logo.png",

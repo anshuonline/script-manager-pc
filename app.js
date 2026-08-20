@@ -5,12 +5,12 @@
 (function () {
   'use strict';
   
-  // GLOBAL CRASH LOGGER
+  // Global error logging (console only, no alerts)
   window.addEventListener('error', (e) => {
-    alert("CRASH: " + (e.error ? e.error.stack : e.message));
+    console.error('App Error:', e.error ? e.error.stack : e.message);
   });
   window.addEventListener('unhandledrejection', (e) => {
-    alert("PROMISE CRASH: " + (e.reason ? (e.reason.stack || e.reason) : "Unknown"));
+    console.error('Promise Error:', e.reason ? (e.reason.stack || e.reason) : 'Unknown');
   });
 
   const STORAGE_KEY = 'scriptManagerData';
@@ -67,8 +67,7 @@
   let savedSelectionRange = null;
   let serverIP = '';
   
-  let ctxSavedRange = null;
-  let ctxCurrentTableCell = null;
+  // Context menu state is now managed by context-menu.js
 
   // ── DOM Helpers ────────────────────────────────────────────
   const $ = (sel) => document.querySelector(sel);
@@ -1654,261 +1653,24 @@
       }
     });
 
-    // ── Custom Context Menu ──────────────────────────────────
-    const ctxMenu = $('#editorContextMenu');
-    const editorEl = $('#editor');
-    const PART_COLORS = ['#6e6aff', '#ff9f43', '#2ed573', '#ff6b81', '#1e90ff'];
-
-    function hideContextMenu() {
-      if (ctxMenu) ctxMenu.hidden = true;
-    }
-
-    function insertTableRow(cell, position) {
-      const tr = cell.closest('tr');
-      if (!tr) return;
-      const clone = tr.cloneNode(true);
-      // clear contents of clone
-      Array.from(clone.children).forEach(td => td.innerHTML = '');
-      if (position === 'above') {
-        tr.parentNode.insertBefore(clone, tr);
-      } else {
-        tr.parentNode.insertBefore(clone, tr.nextSibling);
+    // ── Context Menu Bridge ──────────────────────────────────
+    // All context menu logic is now in context-menu.js (standalone, uses event delegation)
+    // We expose needed app functions via window._smBridge for the external module
+    window._smBridge = {
+      saveEditor: function() {
+        if (typeof saveCurrentEditorContent === 'function') saveCurrentEditorContent();
+      },
+      updateParts: function() {
+        if (typeof updatePartsSidebar === 'function') updatePartsSidebar();
+      },
+      toast: function(msg, type) {
+        if (typeof showToast === 'function') showToast(msg, type || 'info');
+      },
+      save: function() {
+        if (typeof save === 'function') save();
       }
-    }
+    };
 
-    function insertTableColumn(cell, position) {
-      const tr = cell.closest('tr');
-      const table = cell.closest('table');
-      if (!tr || !table) return;
-      const colIndex = Array.from(tr.children).indexOf(cell);
-      
-      const rows = table.querySelectorAll('tr');
-      rows.forEach(row => {
-        const targetCell = row.children[colIndex];
-        if (targetCell) {
-          const clone = targetCell.cloneNode(false);
-          clone.innerHTML = '';
-          if (position === 'left') {
-            row.insertBefore(clone, targetCell);
-          } else {
-            row.insertBefore(clone, targetCell.nextSibling);
-          }
-        }
-      });
-    }
-
-    function deleteTableRow(cell) {
-      const tr = cell.closest('tr');
-      const table = cell.closest('table');
-      if (!tr || !table) return;
-      if (table.querySelectorAll('tr').length <= 1) {
-        table.remove(); // Delete whole table if it's the last row
-      } else {
-        tr.remove();
-      }
-    }
-
-    function deleteTableColumn(cell) {
-      const tr = cell.closest('tr');
-      const table = cell.closest('table');
-      if (!tr || !table) return;
-      const colIndex = Array.from(tr.children).indexOf(cell);
-      
-      const rows = table.querySelectorAll('tr');
-      if (tr.children.length <= 1) {
-        table.remove(); // Delete whole table if it's the last column
-      } else {
-        rows.forEach(row => {
-          if (row.children[colIndex]) {
-            row.children[colIndex].remove();
-          }
-        });
-      }
-    }
-
-    if (editorEl && ctxMenu) {
-      editorEl.addEventListener('contextmenu', (e) => {
-        try {
-          const sel = window.getSelection();
-          if (sel && !sel.isCollapsed) {
-            ctxSavedRange = sel.getRangeAt(0).cloneRange();
-          } else {
-            ctxSavedRange = null;
-          }
-
-          // Always show our custom menu, not just for tables!
-          e.preventDefault();
-
-          // Safe check for table cell
-          let targetEl = e.target;
-          if (targetEl.nodeType === 3) targetEl = targetEl.parentNode; // Handle text nodes
-          
-          const tableCell = targetEl.closest ? targetEl.closest('td, th') : null;
-          if (tableCell) {
-            ctxCurrentTableCell = tableCell;
-          } else {
-            ctxCurrentTableCell = null;
-          }
-          const tableControls = ctxMenu.querySelectorAll('.table-control');
-          tableControls.forEach(ctrl => {
-            ctrl.style.display = tableCell ? 'flex' : 'none'; // Use flex for ctx-menu-item
-          });
-
-          ctxMenu.hidden = false;
-          // Position the menu
-          let x = e.clientX;
-          let y = e.clientY;
-          // Prevent going off screen
-          const menuW = 180;
-          const menuH = 200;
-          if (x + menuW > window.innerWidth) x = window.innerWidth - menuW - 8;
-          if (y + menuH > window.innerHeight) y = window.innerHeight - menuH - 8;
-          ctxMenu.style.left = x + 'px';
-          ctxMenu.style.top = y + 'px';
-        } catch (err) {
-          alert("RIGHT CLICK ERROR: " + err.message + "\n" + err.stack);
-        }
-      });
-
-      // Close context menu on click elsewhere
-      document.addEventListener('click', (e) => {
-        if (!ctxMenu.contains(e.target)) hideContextMenu();
-      });
-      document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') hideContextMenu();
-      });
-
-      // Handle context menu actions
-      ctxMenu.querySelectorAll('.ctx-menu-item').forEach(btn => {
-        btn.addEventListener('mousedown', (e) => {
-          e.preventDefault(); // Don't steal focus/selection
-        });
-        btn.addEventListener('click', (e) => {
-          e.preventDefault();
-          const action = btn.dataset.action;
-
-          // Restore saved selection
-          if (ctxSavedRange) {
-            const sel = window.getSelection();
-            sel.removeAllRanges();
-            sel.addRange(ctxSavedRange);
-          }
-
-          switch (action) {
-            case 'bold':
-              document.execCommand('bold');
-              break;
-            case 'italic':
-              document.execCommand('italic');
-              break;
-            case 'highlight':
-              document.execCommand('backColor', false, 'rgba(255, 235, 59, 0.3)');
-              break;
-            case 'remove-highlight':
-              document.execCommand('backColor', false, 'transparent');
-              break;
-            case 'make-part':
-              window.createPartFromSelection();
-              break;
-            case 'case-toggle': {
-              const currentSel = window.getSelection();
-              if (currentSel && currentSel.rangeCount > 0 && !currentSel.isCollapsed) {
-                const text = currentSel.toString();
-                const isUpper = text === text.toUpperCase();
-                const newText = isUpper ? text.toLowerCase() : text.toUpperCase();
-                document.execCommand('insertText', false, newText);
-              }
-              break;
-            }
-            case 'insert-row-above':
-              if (ctxCurrentTableCell) insertTableRow(ctxCurrentTableCell, 'above');
-              break;
-            case 'insert-row-below':
-              if (ctxCurrentTableCell) insertTableRow(ctxCurrentTableCell, 'below');
-              break;
-            case 'insert-col-left':
-              if (ctxCurrentTableCell) insertTableColumn(ctxCurrentTableCell, 'left');
-              break;
-            case 'insert-col-right':
-              if (ctxCurrentTableCell) insertTableColumn(ctxCurrentTableCell, 'right');
-              break;
-            case 'delete-row':
-              if (ctxCurrentTableCell) deleteTableRow(ctxCurrentTableCell);
-              break;
-            case 'delete-col':
-              if (ctxCurrentTableCell) deleteTableColumn(ctxCurrentTableCell);
-              break;
-          }
-
-          hideContextMenu();
-          saveCurrentEditorContent();
-        });
-      });
-    }
-
-    window.createPartFromSelection = function createPartFromSelection() {
-      const sel = window.getSelection();
-      if (!sel || sel.isCollapsed || sel.rangeCount === 0) {
-        alert('Pehle kuch text select kijiye!');
-        return;
-      }
-      
-      const range = sel.getRangeAt(0);
-      const existingParts = editorEl ? editorEl.querySelectorAll('.script-part').length : 0;
-      const defaultName = 'Part ' + (existingParts + 1);
-
-      // Show custom prompt
-      const overlay = $('#customPromptOverlay');
-      const input = $('#customPromptInput');
-      const btnOk = $('#customPromptOk');
-      const btnCancel = $('#customPromptCancel');
-
-      if (!overlay) return;
-
-      input.value = defaultName;
-      overlay.hidden = false;
-      input.focus();
-      input.select();
-
-      // We need to handle the promise-like behavior
-      function closePrompt() {
-        overlay.hidden = true;
-        // Clean up listeners
-        btnOk.onclick = null;
-        btnCancel.onclick = null;
-        input.onkeydown = null;
-        
-        // Restore selection safely
-        const sel = window.getSelection();
-        sel.removeAllRanges();
-        sel.addRange(range);
-      }
-
-      function applyPart(partName) {
-        closePrompt();
-        if (!partName) return;
-
-        const content = range.extractContents();
-        const partDiv = document.createElement('div');
-        partDiv.className = 'script-part';
-        partDiv.id = 'part-' + Date.now();
-        partDiv.dataset.partName = partName.trim() || defaultName;
-        partDiv.dataset.partColor = String((existingParts % 5) + 1);
-        partDiv.appendChild(content);
-        range.insertNode(partDiv);
-
-        window.getSelection().removeAllRanges();
-        updatePartsSidebar();
-        saveCurrentEditorContent();
-      }
-
-      btnOk.onclick = () => applyPart(input.value);
-      btnCancel.onclick = () => closePrompt();
-      input.onkeydown = (e) => {
-        if (e.key === 'Enter') applyPart(input.value);
-        if (e.key === 'Escape') closePrompt();
-      };
-    }
 
     // Font size slider
     const fontSizeSlider = $('#fontSizeSlider');
@@ -2548,59 +2310,6 @@
       }
     });
 
-    // Listen for native context menu actions from main process
-    ipcRenderer.on('context-menu-action', (event, action) => {
-      alert("IPC RECEIVED: " + action);
-      
-      // Debug toast to ensure IPC works
-      if (typeof showToast === 'function') {
-        showToast('Action received: ' + action, 'success');
-      }
-      
-      setTimeout(() => {
-        const editorEl = $('#editor');
-        if (editorEl) editorEl.focus();
-
-        if (ctxSavedRange) {
-          const sel = window.getSelection();
-          sel.removeAllRanges();
-          sel.addRange(ctxSavedRange);
-        } else {
-          if (typeof showToast === 'function') {
-            showToast('Warning: No saved selection!', 'error');
-          }
-        }
-
-        switch (action) {
-          case 'make-part':
-            if (typeof window.createPartFromSelection === 'function') {
-              window.createPartFromSelection();
-            } else {
-              alert('Error: createPartFromSelection not ready yet!');
-            }
-            break;
-          case 'insert-broll':
-            document.execCommand('insertText', false, '[B-ROLL]');
-            break;
-          case 'highlight':
-            document.execCommand('backColor', false, 'yellow');
-            break;
-          case 'case-toggle': {
-            const currentSel = window.getSelection();
-            if (currentSel && currentSel.rangeCount > 0 && !currentSel.isCollapsed) {
-              const text = currentSel.toString();
-              const isUpper = text === text.toUpperCase();
-              const newText = isUpper ? text.toLowerCase() : text.toUpperCase();
-              document.execCommand('insertText', false, newText);
-            }
-            break;
-          }
-          case 'clear-format':
-            document.execCommand('removeFormat');
-            break;
-        }
-      }, 100); // increased timeout to ensure focus
-    });
 
     window.activePartItemContextMenu = null;
 
