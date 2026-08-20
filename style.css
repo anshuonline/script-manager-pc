@@ -926,8 +926,17 @@ body {
   position: relative;
 }
 
-.editor-content * {
+.editor-content *,
+.editor-content *:focus,
+.editor-content *:focus-visible {
   outline: none !important;
+}
+
+/* Strip borders from pasted chatgpt/claude wrappers */
+.editor-content [inline-copy-host],
+.editor-content .markdown {
+  border: none !important;
+  box-shadow: none !important;
 }
 
 .editor-content:empty::before {
