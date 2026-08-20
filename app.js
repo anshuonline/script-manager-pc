@@ -2316,26 +2316,38 @@
 
     // ── What's New Popup (show once per version + on rail button click) ──────────────
     const CURRENT_VERSION = '1.12.0';
+
+    window.openWhatsNew = function() {
+      const wnModal = $('#whatsNewModal');
+      if (wnModal) {
+        wnModal.removeAttribute('hidden');
+        wnModal.style.display = 'flex';
+      }
+    };
+
+    window.closeWhatsNew = function() {
+      const wnModal = $('#whatsNewModal');
+      if (wnModal) {
+        wnModal.setAttribute('hidden', '');
+        wnModal.style.display = 'none';
+      }
+      localStorage.setItem('sm_seen_version', CURRENT_VERSION);
+    };
+
     const wnModal = $('#whatsNewModal');
     if (wnModal) {
-      const closeWN = () => {
-        wnModal.hidden = true;
-        localStorage.setItem('sm_seen_version', CURRENT_VERSION);
-      };
-      $('#whatsNewCloseBtn')?.addEventListener('click', closeWN);
-      $('#whatsNewGotItBtn')?.addEventListener('click', closeWN);
       wnModal.addEventListener('click', (e) => {
-        if (e.target === wnModal) closeWN();
+        if (e.target === wnModal) window.closeWhatsNew();
       });
 
       const seenVersion = localStorage.getItem('sm_seen_version');
       if (seenVersion !== CURRENT_VERSION) {
-        setTimeout(() => { wnModal.hidden = false; }, 800);
+        setTimeout(() => { window.openWhatsNew(); }, 800);
       }
 
-      // Rail icon button click to open What's New anytime
-      $('#whatsNewRailBtn')?.addEventListener('click', () => {
-        wnModal.hidden = false;
+      $('#whatsNewRailBtn')?.addEventListener('click', (e) => {
+        e.preventDefault();
+        window.openWhatsNew();
       });
     }
 

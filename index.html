@@ -33,7 +33,7 @@
         </button>
       </div>
       <div class="rail-bottom">
-        <button id="whatsNewRailBtn" class="rail-tab" title="What's New (Changelog)">
+        <button id="whatsNewRailBtn" class="rail-tab" onclick="openWhatsNew()" title="What's New (Changelog)">
           <span class="rail-icon">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M12 3l1.912 5.813a2 2 0 001.272 1.272L21 12l-5.813 1.912a2 2 0 00-1.272 1.272L12 21l-1.912-5.813a2 2 0 00-1.272-1.272L3 12l5.813-1.912a2 2 0 001.272-1.272L12 3z"></path>
@@ -981,7 +981,7 @@
           <h2 class="whats-new-title">What's New in Script Manager</h2>
           <p class="whats-new-version">Version 1.12.0 — Major Update (August 2026)</p>
         </div>
-        <button id="whatsNewCloseBtn" class="whats-new-close">✕</button>
+        <button id="whatsNewCloseBtn" class="whats-new-close" onclick="closeWhatsNew()">✕</button>
       </div>
       <div class="whats-new-body">
         <div class="wn-section">
@@ -1028,7 +1028,7 @@
         </div>
       </div>
       <div class="whats-new-footer">
-        <button id="whatsNewGotItBtn" class="whats-new-cta">Got it, Let's go! 🚀</button>
+        <button id="whatsNewGotItBtn" class="whats-new-cta" onclick="closeWhatsNew()">Got it, Let's go! 🚀</button>
       </div>
     </div>
   </div>
