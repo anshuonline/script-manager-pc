@@ -99,7 +99,7 @@
       pointer-events: auto;
     }
 
-    #ctxPartModal {
+    #ctxPartModal, #ctxErrorModal {
       width: 360px;
       padding: 24px;
       background: rgba(26, 26, 40, 0.97);
@@ -118,12 +118,39 @@
       opacity: 0;
     }
 
-    #ctxPartOverlay.ctx-modal-visible #ctxPartModal {
+    #ctxErrorOverlay {
+      position: fixed;
+      inset: 0;
+      z-index: 1000000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0, 0, 0, 0.55);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.18s ease;
+    }
+    #ctxErrorOverlay.ctx-modal-visible {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    #ctxErrorModal h3 {
+      color: #ff6b81;
+    }
+    #ctxErrorMessage {
+      font-size: 14px;
+      line-height: 1.5;
+      margin-bottom: 20px;
+    }
+
+
+    #ctxPartOverlay.ctx-modal-visible #ctxPartModal,
+    #ctxErrorOverlay.ctx-modal-visible #ctxErrorModal {
       transform: scale(1) translateY(0);
       opacity: 1;
     }
 
-    #ctxPartModal h3 {
+    #ctxPartModal h3, #ctxErrorModal h3 {
       margin: 0 0 16px;
       font-size: 15px;
       font-weight: 600;
@@ -219,6 +246,33 @@
   const partInput = document.getElementById('ctxPartInput');
   const partBtnOk = document.getElementById('ctxPartOk');
   const partBtnCancel = document.getElementById('ctxPartCancel');
+
+  const errorOverlay = document.createElement('div');
+  errorOverlay.id = 'ctxErrorOverlay';
+  errorOverlay.innerHTML = `
+    <div id="ctxErrorModal">
+      <h3>Wait!</h3>
+      <p id="ctxErrorMessage"></p>
+      <div class="ctx-modal-btns">
+        <button class="ctx-modal-btn ctx-modal-btn-ok" id="ctxErrorOk">Got it</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(errorOverlay);
+
+  const errorMsg = document.getElementById('ctxErrorMessage');
+  const errorBtnOk = document.getElementById('ctxErrorOk');
+
+  function showErrorPrompt(msg) {
+    errorMsg.textContent = msg;
+    errorOverlay.classList.add('ctx-modal-visible');
+  }
+
+  function hideErrorPrompt() {
+    errorOverlay.classList.remove('ctx-modal-visible');
+  }
+  
+  errorBtnOk.addEventListener('click', hideErrorPrompt);
 
   // ---------------------------------------------------------------------------
   // 4. Utility helpers
@@ -553,6 +607,27 @@
 
     switch (action) {
       case 'makePart': {
+        const sel = window.getSelection();
+        if (!sel || sel.rangeCount === 0 || sel.isCollapsed) {
+          showErrorPrompt("Please select some text first.");
+          break;
+        }
+
+        const range = sel.getRangeAt(0);
+
+        // Check if selection is already inside a part
+        let node = range.commonAncestorContainer;
+        if (node.nodeType === 3) node = node.parentElement;
+        const insidePart = node.closest('.script-part');
+
+        // Check if selection contains a part
+        const containsPart = range.cloneContents().querySelector('.script-part');
+
+        if (insidePart || containsPart) {
+          showErrorPrompt("Some selected text is already in another part. Please select text outside existing parts to make a new part.");
+          break;
+        }
+
         // Count existing parts to suggest a default name
         const editor = document.getElementById('editor');
         const existing = editor ? editor.querySelectorAll('.script-part').length : 0;

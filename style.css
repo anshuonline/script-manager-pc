@@ -882,24 +882,56 @@ body {
   line-height: inherit !important;
 }
 
-/* Highlighted Script Part */
+/* Highlighted Script Part (Modern Bubble Design) */
 .editor-content .script-part {
-  border-left: 3px solid var(--accent);
-  padding: 4px 8px;
-  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  position: relative;
   display: block;
-  margin: 8px 0;
-  transition: background-color 0.3s ease;
+  margin: 28px 0 16px 0; /* extra top margin for the badge */
+  padding: 16px 18px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  transition: all 0.25s ease;
 }
+
+/* Floating Part Name Badge */
+.editor-content .script-part::before {
+  content: attr(data-part-name);
+  position: absolute;
+  top: -14px;
+  left: 16px;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  z-index: 2;
+  transition: all 0.25s ease;
+}
+
 /* Rotating part colors */
-.editor-content .script-part[data-part-color="1"] { background-color: rgba(110, 106, 255, 0.15); border-left-color: #6e6aff; }
-.editor-content .script-part[data-part-color="2"] { background-color: rgba(255, 159, 67, 0.15); border-left-color: #ff9f43; }
-.editor-content .script-part[data-part-color="3"] { background-color: rgba(46, 213, 115, 0.15); border-left-color: #2ed573; }
-.editor-content .script-part[data-part-color="4"] { background-color: rgba(255, 107, 129, 0.15); border-left-color: #ff6b81; }
-.editor-content .script-part[data-part-color="5"] { background-color: rgba(30, 144, 255, 0.15); border-left-color: #1e90ff; }
+.editor-content .script-part[data-part-color="1"] { background-color: rgba(110, 106, 255, 0.08); border-color: rgba(110, 106, 255, 0.3); }
+.editor-content .script-part[data-part-color="1"]::before { background-color: #6e6aff; }
+
+.editor-content .script-part[data-part-color="2"] { background-color: rgba(255, 159, 67, 0.08); border-color: rgba(255, 159, 67, 0.3); }
+.editor-content .script-part[data-part-color="2"]::before { background-color: #ff9f43; color: #fff; }
+
+.editor-content .script-part[data-part-color="3"] { background-color: rgba(46, 213, 115, 0.08); border-color: rgba(46, 213, 115, 0.3); }
+.editor-content .script-part[data-part-color="3"]::before { background-color: #2ed573; color: #111; } /* Dark text for green badge */
+
+.editor-content .script-part[data-part-color="4"] { background-color: rgba(255, 107, 129, 0.08); border-color: rgba(255, 107, 129, 0.3); }
+.editor-content .script-part[data-part-color="4"]::before { background-color: #ff6b81; }
+
+.editor-content .script-part[data-part-color="5"] { background-color: rgba(30, 144, 255, 0.08); border-color: rgba(30, 144, 255, 0.3); }
+.editor-content .script-part[data-part-color="5"]::before { background-color: #1e90ff; }
+
 .editor-content .script-part.part-active {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
+  outline: none;
+  box-shadow: 0 0 0 2px var(--accent), 0 8px 24px rgba(0,0,0,0.3);
+  transform: translateY(-2px);
 }
 
 /* Custom Context Menu */
