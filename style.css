@@ -977,12 +977,21 @@ body {
 /* Force pasted text to inherit editor scaling and theme */
 .editor-content span,
 .editor-content p,
-.editor-content div,
 .editor-content li {
   font-size: inherit !important;
   font-family: inherit !important;
   line-height: inherit !important;
 }
+/* Only apply inherit to plain divs that are NOT script-parts */
+.editor-content div:not(.script-part):not(.cdp-dots) {
+  font-size: inherit !important;
+  font-family: inherit !important;
+  line-height: inherit !important;
+}
+/* Ensure headings keep their defined sizes */
+.editor-content h1 { font-size: 1.6em !important; }
+.editor-content h2 { font-size: 1.333em !important; }
+.editor-content h3 { font-size: 1.133em !important; }
 
 /* Force visible selection highlight for Find & Replace */
 .editor-content ::selection {
@@ -3796,4 +3805,372 @@ body.sidebars-hidden .tools-sidebar {
 
 body.dragging-insert-block #editor {
   background-color: rgba(37, 99, 235, 0.02);
+}
+
+/* --------------- Content Planner --------------- */
+#plannerView {
+  display: none;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  background: var(--bg-primary);
+  overflow: hidden;
+}
+#plannerView.active {
+  display: flex;
+}
+
+.planner-dashboard {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 24px;
+}
+
+.planner-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+.planner-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+/* Kanban Board */
+.planner-kanban-board {
+  display: flex;
+  gap: 16px;
+  flex-grow: 1;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 16px;
+}
+.planner-kanban-board::-webkit-scrollbar {
+  height: 8px;
+}
+.planner-kanban-board::-webkit-scrollbar-track {
+  background: var(--glass-1);
+  border-radius: 4px;
+}
+.planner-kanban-board::-webkit-scrollbar-thumb {
+  background: var(--glass-3);
+  border-radius: 4px;
+}
+
+.kanban-column {
+  flex: 0 0 300px;
+  background: var(--glass-1);
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  border: 1px solid var(--border);
+}
+
+.kanban-column-header {
+  padding: 16px;
+  border-bottom: 1px solid var(--border);
+}
+.kanban-column-header h3 {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.kpi-badge {
+  background: var(--glass-2);
+  color: var(--text-secondary);
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 12px;
+}
+
+.kanban-cards {
+  flex-grow: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 100px;
+}
+.kanban-cards::-webkit-scrollbar { width: 6px; }
+.kanban-cards::-webkit-scrollbar-thumb { background: var(--glass-2); border-radius: 3px; }
+
+/* Kanban Card */
+.kanban-card {
+  background: var(--glass-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 14px;
+  cursor: grab;
+  transition: all 0.2s var(--ease);
+  position: relative;
+}
+.kanban-card:hover {
+  border-color: var(--accent);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  transform: translateY(-2px);
+}
+.kanban-card:active {
+  cursor: grabbing;
+}
+.kanban-card.dragging {
+  opacity: 0.5;
+  transform: scale(0.95);
+}
+
+.kanban-card-title {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+  line-height: 1.4;
+}
+.kanban-card-meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.kanban-card-checklist {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+
+
+/* Idea Dump Drawer */
+.idea-dump-drawer {
+  flex: 0 0 320px;
+  background: var(--glass-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.idea-dump-header {
+  padding: 16px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.idea-dump-header h3 {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.idea-search {
+  padding: 12px;
+  border-bottom: 1px solid var(--border);
+}
+.idea-search input {
+  width: 100%;
+  padding: 8px 12px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  outline: none;
+}
+.idea-list {
+  flex-grow: 1;
+  overflow-y: auto;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.idea-card {
+  background: var(--glass-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  cursor: pointer;
+  transition: all 0.2s var(--ease);
+}
+.idea-card:hover {
+  border-color: var(--accent);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+.idea-card-title {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text-primary);
+  margin-bottom: 6px;
+}
+.idea-card-desc {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.idea-card-actions {
+  margin-top: 8px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.btn-idea-action {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 4px;
+  transition: color 0.2s;
+}
+.btn-idea-action:hover {
+  color: var(--accent);
+}
+
+
+/* =========================================
+   COMMENTS SYSTEM UI
+   ========================================= */
+
+/* Inline Highlight in Editor */
+.sm-comment-mark {
+  background-color: rgba(255, 234, 0, 0.3);
+  border-bottom: 2px solid #ffea00;
+  cursor: pointer;
+  border-radius: 3px;
+  padding: 0 2px;
+  transition: background-color 0.2s;
+}
+
+.sm-comment-mark:hover, .sm-comment-mark.active {
+  background-color: rgba(255, 234, 0, 0.6);
+}
+
+/* Floating Inline Popover (Google Docs style) */
+.inline-comment-popover {
+  position: absolute;
+  z-index: 1000;
+  width: 280px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--glass-border);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+  padding: 12px;
+  font-size: 13px;
+  color: var(--text-primary);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.popover-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--glass-border);
+  padding-bottom: 6px;
+}
+
+.popover-author {
+  font-weight: 600;
+  color: var(--primary);
+}
+
+.popover-time {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.popover-body {
+  line-height: 1.4;
+  word-wrap: break-word;
+}
+
+/* Right Sidebar Comments List */
+.comments-sidebar-header {
+  padding: 16px;
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.comments-sidebar-header h3 {
+  margin: 0 0 4px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.comments-list {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.comment-card {
+  background: var(--bg-tertiary, #2a2a2a);
+  border: 1px solid var(--glass-border);
+  border-radius: 6px;
+  padding: 12px;
+  cursor: pointer;
+  transition: border-color 0.2s, background-color 0.2s;
+}
+
+.comment-card:hover, .comment-card.active {
+  border-color: var(--primary);
+  background: var(--bg-hover, #333);
+}
+
+.comment-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.comment-card-author {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--primary);
+}
+
+.comment-card-time {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.comment-card-text {
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--text-secondary);
+  word-wrap: break-word;
+}
+
+.comment-card-actions {
+  margin-top: 8px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.btn-delete-comment {
+  background: none;
+  border: none;
+  color: #ff6b81;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.btn-delete-comment:hover {
+  background: rgba(255, 107, 129, 0.1);
 }

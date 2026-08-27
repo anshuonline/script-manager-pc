@@ -533,6 +533,7 @@
         $('#lineSpacingBtn')?.classList.add('active');
       }
       updatePartsSidebar();
+      updateCommentsSidebar();
       if (typeof updateEditorStats === 'function') {
         updateEditorStats();
       }
@@ -693,11 +694,95 @@
     state.calendarDate = new Date();
     renderCalendar();
   }
-
   // ── Rich Text Editor ──────────────────────────────────────
   function execFormat(command, value = null) {
+    const editor = $('#editor');
+    
+    // Special handling for formatBlock — use manual DOM replacement
+    // Chrome's execCommand('formatBlock') is unreliable inside nested divs (.script-part)
+    // and often injects unwanted inline styles. We handle it manually everywhere.
+    if (command === 'formatBlock' && value) {
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount > 0) {
+        let node = sel.anchorNode;
+        if (node && node.nodeType === 3) node = node.parentElement;
+        if (!node) { editor.focus(); return; }
+        
+        // Find the closest block element containing the cursor
+        let block = node;
+        const blockTags = ['P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'DIV', 'BLOCKQUOTE'];
+        
+        // Walk up to find a block-level element, but stop at editor or .script-part boundary
+        while (block && block !== editor) {
+          if (block.classList && block.classList.contains('script-part')) {
+            // Don't convert the .script-part div itself
+            block = null;
+            break;
+          }
+          if (blockTags.includes(block.tagName)) break;
+          block = block.parentElement;
+        }
+        
+        if (block && block !== editor && blockTags.includes(block.tagName)) {
+          const newTag = value.replace(/[<>]/g, '').toLowerCase();
+          
+          // Don't replace if already the same tag
+          if (block.tagName.toLowerCase() === newTag) {
+            editor.focus();
+            return;
+          }
+          
+          const newEl = document.createElement(newTag);
+          newEl.innerHTML = block.innerHTML;
+          
+          // Strip ALL inline font-size/font-family/line-height styles
+          // These are leftovers from heading formatting
+          newEl.style.fontSize = '';
+          newEl.style.fontFamily = '';
+          newEl.style.lineHeight = '';
+          newEl.style.fontWeight = '';
+          // Clean empty style attribute
+          if (!newEl.getAttribute('style')?.trim()) {
+            newEl.removeAttribute('style');
+          }
+          
+          // Also clean children that might have inline heading styles
+          newEl.querySelectorAll('[style]').forEach(child => {
+            child.style.fontSize = '';
+            child.style.fontFamily = '';
+            child.style.lineHeight = '';
+            if (!child.getAttribute('style')?.trim()) {
+              child.removeAttribute('style');
+            }
+          });
+          
+          block.parentNode.replaceChild(newEl, block);
+          
+          // Place cursor inside new element
+          const range = document.createRange();
+          range.selectNodeContents(newEl);
+          range.collapse(false);
+          sel.removeAllRanges();
+          sel.addRange(range);
+          
+          // Save after format change
+          if (window._smBridge && typeof window._smBridge.saveEditor === 'function') {
+            window._smBridge.saveEditor();
+          }
+          
+          editor.focus();
+          return;
+        }
+      }
+      
+      // Fallback to execCommand for edge cases
+      document.execCommand(command, false, value);
+      editor.focus();
+      return;
+    }
+    
     document.execCommand(command, false, value);
-    $('#editor').focus();
+    editor.focus();
   }
 
   function insertLink() {
@@ -2628,10 +2713,65 @@
         return;
       }
 
-      if (action === 'delete-part') {
-        const fragment = document.createDocumentFragment();
-        while (partEl.firstChild) fragment.appendChild(partEl.firstChild);
-        partEl.parentNode.replaceChild(fragment, partEl);
+      if (action === 'edit-part-name') {
+        const currentName = partEl.dataset.partName || 'Part';
+        const newName = prompt('Enter new part name:', currentName);
+        if (newName && newName.trim() !== '') {
+          partEl.dataset.partName = newName.trim();
+          updatePartsSidebar();
+          saveCurrentEditorContent();
+        }
+      } else if (action === 'delete-part') {
+        // Unwrap part: move all children out, normalize DOM
+        const parent = partEl.parentNode;
+        const children = Array.from(partEl.childNodes);
+        
+        children.forEach(child => {
+          if (child.nodeType === 3) {
+            // Bare text node → wrap in <p>
+            if (child.textContent.trim() !== '') {
+              const p = document.createElement('p');
+              p.textContent = child.textContent;
+              parent.insertBefore(p, partEl);
+            }
+          } else if (child.nodeType === 1) {
+            // Convert headings to paragraphs to prevent font-size issues
+            const headingTags = ['H1', 'H2', 'H3', 'H4', 'H5', 'H6'];
+            if (headingTags.includes(child.tagName)) {
+              const p = document.createElement('p');
+              p.innerHTML = child.innerHTML;
+              parent.insertBefore(p, partEl);
+            } else if (child.tagName === 'DIV' && !child.classList.length) {
+              // Plain divs → convert to <p>
+              const p = document.createElement('p');
+              p.innerHTML = child.innerHTML;
+              parent.insertBefore(p, partEl);
+            } else {
+              parent.insertBefore(child, partEl);
+            }
+            
+            // Strip ALL inline font styles from this element and its children
+            const toClean = child.parentNode ? [child, ...child.querySelectorAll('[style]')] : [];
+            toClean.forEach(el => {
+              if (el.style) {
+                el.style.fontSize = '';
+                el.style.fontFamily = '';
+                el.style.lineHeight = '';
+                el.style.fontWeight = '';
+                if (!el.getAttribute('style')?.trim()) {
+                  el.removeAttribute('style');
+                }
+              }
+            });
+          }
+        });
+        
+        parent.removeChild(partEl);
+        
+        // Clean up: normalize editor to merge adjacent text nodes
+        const editorEl = document.getElementById('editor');
+        if (editorEl) editorEl.normalize();
+        
         updatePartsSidebar();
         saveCurrentEditorContent();
       } else if (action === 'change-color') {
@@ -2658,6 +2798,124 @@
       }
     });
   }
+
+  // ── Comments Sidebar Logic ─────────────────────────────────
+  function updateCommentsSidebar() {
+    const commentsList = $('#commentsList');
+    if (!commentsList) return;
+    commentsList.innerHTML = '';
+    
+    const editorEl = $('#editor');
+    if (!editorEl) return;
+    
+    const comments = Array.from(editorEl.querySelectorAll('.sm-comment-mark'));
+    
+    if (comments.length === 0) {
+      commentsList.innerHTML = `
+        <div class="empty-state" style="padding: 20px; text-align: center; color: var(--text-muted); font-size: 13px;">
+          No comments yet. Select text and right-click to add one.
+        </div>
+      `;
+      return;
+    }
+
+    comments.forEach(mark => {
+      const author = mark.dataset.author || 'Anonymous';
+      const text = mark.dataset.text || '';
+      const timeStr = mark.dataset.time;
+      let displayTime = '';
+      if (timeStr) {
+        const d = new Date(timeStr);
+        displayTime = d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+      }
+
+      const card = document.createElement('div');
+      card.className = 'comment-card';
+      card.dataset.commentId = mark.id;
+      
+      card.innerHTML = `
+        <div class="comment-card-header">
+          <span class="comment-card-author">${author}</span>
+          <span class="comment-card-time">${displayTime}</span>
+        </div>
+        <div class="comment-card-text">${text}</div>
+        <div class="comment-card-actions">
+          <button class="btn-delete-comment" title="Delete Comment">Delete</button>
+        </div>
+      `;
+
+      // Click card to scroll to comment
+      card.addEventListener('click', (e) => {
+        if (e.target.classList.contains('btn-delete-comment')) return; // handled below
+        
+        // Highlight active card
+        commentsList.querySelectorAll('.comment-card').forEach(c => c.classList.remove('active'));
+        card.classList.add('active');
+        
+        // Highlight active mark
+        editorEl.querySelectorAll('.sm-comment-mark').forEach(m => m.classList.remove('active'));
+        mark.classList.add('active');
+
+        mark.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      });
+
+      // Delete comment
+      const deleteBtn = card.querySelector('.btn-delete-comment');
+      deleteBtn.addEventListener('click', () => {
+        // Unwrap the text
+        while (mark.firstChild) mark.parentNode.insertBefore(mark.firstChild, mark);
+        mark.remove();
+        updateCommentsSidebar();
+        saveCurrentEditorContent();
+        $('#inlineCommentPopover').hidden = true;
+      });
+
+      commentsList.appendChild(card);
+    });
+  }
+
+  // Handle inline popover when clicking a comment in editor
+  const popover = $('#inlineCommentPopover');
+  if (popover) {
+    document.addEventListener('click', (e) => {
+      const mark = e.target.closest('.sm-comment-mark');
+      if (mark) {
+        const rect = mark.getBoundingClientRect();
+        
+        $('#popoverAuthor').textContent = mark.dataset.author || 'Anonymous';
+        $('#popoverText').textContent = mark.dataset.text || '';
+        
+        let displayTime = '';
+        if (mark.dataset.time) {
+          const d = new Date(mark.dataset.time);
+          displayTime = d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        }
+        $('#popoverTime').textContent = displayTime;
+
+        popover.style.top = (rect.bottom + window.scrollY + 8) + 'px';
+        popover.style.left = (rect.left + window.scrollX) + 'px';
+        popover.hidden = false;
+
+        // Sync sidebar active state
+        const commentsList = $('#commentsList');
+        if (commentsList) {
+          commentsList.querySelectorAll('.comment-card').forEach(c => c.classList.remove('active'));
+          const activeCard = commentsList.querySelector(`.comment-card[data-comment-id="${mark.id}"]`);
+          if (activeCard) activeCard.classList.add('active');
+        }
+        
+        $('#editor').querySelectorAll('.sm-comment-mark').forEach(m => m.classList.remove('active'));
+        mark.classList.add('active');
+      } else if (!e.target.closest('#inlineCommentPopover')) {
+        popover.hidden = true;
+        $('#editor')?.querySelectorAll('.sm-comment-mark').forEach(m => m.classList.remove('active'));
+        $('#commentsList')?.querySelectorAll('.comment-card').forEach(c => c.classList.remove('active'));
+      }
+    });
+  }
+
+  window._smBridge = window._smBridge || {};
+  window._smBridge.updateCommentsSidebar = updateCommentsSidebar;
 
   // ── Parts Sidebar Logic ────────────────────────────────────
   const PART_SIDEBAR_COLORS = ['#6e6aff', '#ff9f43', '#2ed573', '#ff6b81', '#1e90ff'];

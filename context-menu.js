@@ -315,6 +315,8 @@
       { label: 'Make Part',          action: 'makePart' },
       { label: 'Highlight',          action: 'highlight' },
       { label: 'Remove Highlight',   action: 'removeHighlight' },
+      { label: '💬 Add Comment',     action: 'addComment' },
+      { separator: true },
       { label: 'Toggle Case',        action: 'toggleCase' },
       { label: 'Clear Formatting',   action: 'clearFormatting' },
     ];
@@ -432,70 +434,93 @@
     const sel = window.getSelection();
     if (!sel.rangeCount) return;
 
+    const editor = document.getElementById('editor');
+    if (!editor) return;
+
     const range = sel.getRangeAt(0);
     const colorIndex = (partCounter++ % PART_COLORS.length);
-    const color = PART_COLORS[colorIndex];
     const id = uid();
 
+    // ── Safety Check 1: abort if selection is inside an existing part ──
+    let ancestor = range.commonAncestorContainer;
+    if (ancestor.nodeType === 3) ancestor = ancestor.parentElement;
+    if (ancestor && ancestor.closest && ancestor.closest('.script-part')) {
+      showErrorPrompt("Selection is inside an existing part. Please select text outside parts.");
+      return;
+    }
+
+    // ── Safety Check 2: abort if selection overlaps with any part ──
+    const testFragment = range.cloneContents();
+    const testDiv = document.createElement('div');
+    testDiv.appendChild(testFragment);
+    if (testDiv.querySelector('.script-part')) {
+      showErrorPrompt("Selection overlaps with an existing part. Please select text outside parts.");
+      return;
+    }
+
+    // ── Build wrapper with cloned content ──
+    const fragment = range.cloneContents();
     const wrapper = document.createElement('div');
     wrapper.className = 'script-part';
     wrapper.id = id;
     wrapper.setAttribute('data-part-name', name);
     wrapper.setAttribute('data-part-color', String(colorIndex + 1));
 
-    // Clone selected content instead of extracting it, so the selection remains intact
-    // and insertHTML can cleanly replace it without the caret snapping into adjacent parts.
-    const fragment = range.cloneContents();
-    
-    // If the extracted fragment is just text, wrap it in a <p> so it formats nicely inside the part.
-    // If it already has block elements, we leave it as is.
     const tempDiv = document.createElement('div');
     tempDiv.appendChild(fragment);
-    
+
     if (tempDiv.innerHTML.trim() !== '') {
-       let hasBlock = false;
-       for (let i = 0; i < tempDiv.childNodes.length; i++) {
-         const node = tempDiv.childNodes[i];
-         if (node.nodeType === 1) { // Element node
-           const tag = node.tagName.toLowerCase();
-           if (['p', 'div', 'h1', 'h2', 'h3', 'blockquote', 'ul', 'ol', 'li', 'table'].includes(tag)) {
-             hasBlock = true;
-             break;
-           }
-         }
-       }
-       if (!hasBlock) {
-         const p = document.createElement('p');
-         p.innerHTML = tempDiv.innerHTML;
-         wrapper.appendChild(p);
-       } else {
-         wrapper.innerHTML = tempDiv.innerHTML;
-       }
+      let hasBlock = false;
+      for (let i = 0; i < tempDiv.childNodes.length; i++) {
+        const node = tempDiv.childNodes[i];
+        if (node.nodeType === 1) {
+          const tag = node.tagName.toLowerCase();
+          if (['p', 'div', 'h1', 'h2', 'h3', 'blockquote', 'ul', 'ol', 'li', 'table'].includes(tag)) {
+            hasBlock = true;
+            break;
+          }
+        }
+      }
+      if (!hasBlock) {
+        const p = document.createElement('p');
+        p.innerHTML = tempDiv.innerHTML;
+        wrapper.appendChild(p);
+      } else {
+        wrapper.innerHTML = tempDiv.innerHTML;
+      }
     } else {
-       wrapper.innerHTML = '<p><br></p>';
+      wrapper.innerHTML = '<p><br></p>';
     }
 
-    // Insert cleanly via insertHTML so the browser fixes invalid nesting (e.g. div inside p)
-    const htmlString = wrapper.outerHTML;
-    document.execCommand('insertHTML', false, htmlString);
+    // ── Insert via insertHTML — this replaces ONLY the selected text ──
+    // Chrome handles <p> splitting automatically when inserting a block element
+    document.execCommand('insertHTML', false, wrapper.outerHTML);
 
-    // CRITICAL: Chrome's insertHTML notoriously injects inline styles like 
-    // <span style="background-color: ..."> to text or paragraphs. We MUST clean this up!
-    const editor = document.getElementById('editor');
-    if (editor) {
-      editor.querySelectorAll('[style]').forEach(el => {
-        // Strip background colors that are not the highlight color (#ffe066 / rgb(255, 224, 102))
+    // ── Aggressive cleanup of inline styles injected by insertHTML ──
+    const newPart = document.getElementById(id);
+    if (newPart) {
+      // Remove any stale style on the part div itself
+      newPart.removeAttribute('style');
+
+      // Clean all children
+      newPart.querySelectorAll('[style]').forEach(el => {
         const bg = el.style.backgroundColor;
         if (bg && !bg.includes('255, 224, 102') && !bg.includes('ffe066') && !bg.includes('yellow')) {
           el.style.backgroundColor = '';
         }
-        if (el.style.lineHeight) el.style.lineHeight = '';
-        if (el.style.fontSize) el.style.fontSize = '';
-        if (el.style.fontFamily) el.style.fontFamily = '';
-        if (el.style.color) el.style.color = '';
-        
-        // If it's a span and has no other styles, unwrap it to keep DOM clean
-        if (el.tagName === 'SPAN' && !el.getAttribute('style')) {
+        el.style.lineHeight = '';
+        el.style.fontSize = '';
+        el.style.fontFamily = '';
+        el.style.color = '';
+        el.style.fontWeight = '';
+
+        // Remove empty style attributes
+        if (!el.getAttribute('style')?.trim()) {
+          el.removeAttribute('style');
+        }
+
+        // Unwrap empty spans
+        if (el.tagName === 'SPAN' && !el.getAttribute('style')?.trim()) {
           const parent = el.parentNode;
           if (parent) {
             while (el.firstChild) parent.insertBefore(el.firstChild, el);
@@ -503,7 +528,29 @@
           }
         }
       });
+
+      // Defensive: remove any accidentally nested parts
+      newPart.querySelectorAll('.script-part').forEach(nested => {
+        while (nested.firstChild) nested.parentNode.insertBefore(nested.firstChild, nested);
+        nested.remove();
+      });
     }
+
+    // Also clean editor-level styles that insertHTML might have left outside the part
+    editor.querySelectorAll(':scope > [style]').forEach(el => {
+      if (!el.classList.contains('script-part')) {
+        const bg = el.style.backgroundColor;
+        if (bg && !bg.includes('255, 224, 102') && !bg.includes('ffe066')) {
+          el.style.backgroundColor = '';
+        }
+        el.style.fontSize = '';
+        el.style.fontFamily = '';
+        el.style.lineHeight = '';
+        if (!el.getAttribute('style')?.trim()) {
+          el.removeAttribute('style');
+        }
+      }
+    });
 
     sel.removeAllRanges();
 
@@ -518,6 +565,61 @@
   function applyHighlight() {
     if (!restoreSelection()) return;
     document.execCommand('hiliteColor', false, '#ffe066');
+  }
+
+  /** Add a comment to the current selection */
+  function addCommentToSelection() {
+    if (!restoreSelection()) return;
+    const sel = window.getSelection();
+    if (!sel.rangeCount || sel.isCollapsed) return;
+
+    // Get author name
+    let authorName = localStorage.getItem('sm_author_name');
+    if (!authorName) {
+      authorName = prompt("Enter your name for comments:");
+      if (!authorName) return; // User cancelled
+      localStorage.setItem('sm_author_name', authorName.trim());
+    }
+
+    // Get comment text
+    const commentText = prompt("Enter your comment:");
+    if (!commentText) return; // User cancelled or empty
+
+    const id = 'comment-' + Math.random().toString(36).substring(2, 9);
+    const time = new Date().toISOString();
+    const range = sel.getRangeAt(0);
+
+    // Ensure we don't nest comments inside existing comments
+    let ancestor = range.commonAncestorContainer;
+    if (ancestor.nodeType === 3) ancestor = ancestor.parentElement;
+    if (ancestor && ancestor.closest && ancestor.closest('.sm-comment-mark')) {
+      showErrorPrompt("Cannot add a comment inside an existing comment highlight.");
+      return;
+    }
+
+    // Wrap with span
+    const span = document.createElement('span');
+    span.className = 'sm-comment-mark';
+    span.id = id;
+    span.setAttribute('data-author', authorName.trim());
+    span.setAttribute('data-text', commentText.trim());
+    span.setAttribute('data-time', time);
+
+    try {
+      range.surroundContents(span);
+    } catch (e) {
+      // If surroundContents fails (e.g. crossing block boundaries), use insertHTML fallback
+      const fragment = range.cloneContents();
+      span.appendChild(fragment);
+      document.execCommand('insertHTML', false, span.outerHTML);
+    }
+
+    sel.removeAllRanges();
+
+    if (window._smBridge) {
+      if (typeof window._smBridge.saveEditor === 'function') window._smBridge.saveEditor();
+      if (typeof window._smBridge.updateCommentsSidebar === 'function') window._smBridge.updateCommentsSidebar();
+    }
   }
 
   /** Remove highlight (background color) from current selection */
@@ -693,6 +795,9 @@
       case 'highlight':
         applyHighlight();
         bridgeSave();
+        break;
+      case 'addComment':
+        addCommentToSelection();
         break;
       case 'removeHighlight':
         removeHighlight();

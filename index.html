@@ -281,10 +281,25 @@
             <button class="tools-tab-btn active" data-tab="insert">Insert</button>
             <button class="tools-tab-btn" data-tab="parts">Parts</button>
             <button class="tools-tab-btn" data-tab="characters" id="openCharactersViewBtn">Characters</button>
+            <button class="tools-tab-btn" data-tab="comments">Comments</button>
           </div>
 
           <!-- Tab Panels -->
           <div class="tools-panels">
+            
+            <!-- Comments Tab -->
+            <div id="tab-comments" class="tools-panel">
+              <div class="comments-sidebar-header">
+                <h3>Notes & Comments</h3>
+                <p class="text-muted" style="font-size: 12px;">Right-click selected text in the editor to add a comment.</p>
+              </div>
+              <div id="commentsList" class="comments-list">
+                <!-- Comments will be injected here dynamically -->
+                <div class="empty-state" style="padding: 20px; text-align: center; color: var(--text-muted); font-size: 13px;">
+                  No comments yet.
+                </div>
+              </div>
+            </div>
             
             <!-- Insert Tab -->
             <div id="tab-insert" class="tools-panel active">
@@ -989,12 +1004,26 @@
 
   <!-- Part Context Menu -->
   <div id="partContextMenu" class="editor-context-menu" hidden>
+    <button class="ctx-menu-item" data-action="edit-part-name">✏️&nbsp;&nbsp;Edit Name</button>
     <button class="ctx-menu-item" data-action="print-part">🖨️&nbsp;&nbsp;Print Part</button>
     <button class="ctx-menu-item" data-action="change-color">🎨&nbsp;&nbsp;Change Color</button>
     <div class="ctx-menu-divider"></div>
     <button class="ctx-menu-item" data-action="delete-part" style="color: #ff6b81;">🗑️&nbsp;&nbsp;Delete Part</button>
   </div>
 
+  <!-- Text Context Menu (for selection) -->
+  <div id="textContextMenu" class="editor-context-menu" hidden>
+    <button class="ctx-menu-item" data-action="add-comment">💬&nbsp;&nbsp;Add Comment</button>
+  </div>
+
+  <!-- Inline Comment Popover (Google Docs style) -->
+  <div id="inlineCommentPopover" class="inline-comment-popover" hidden>
+    <div class="popover-header">
+      <span class="popover-author" id="popoverAuthor">Author Name</span>
+      <span class="popover-time" id="popoverTime">Time</span>
+    </div>
+    <div class="popover-body" id="popoverText">Comment text goes here...</div>
+  </div>
   <script src="components/characters/vis-network.min.js" defer></script>
   <script src="components/characters/characters.js" defer></script>
   <script src="components/characters/editor-mention.js" defer></script>
