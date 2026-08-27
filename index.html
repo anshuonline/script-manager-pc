@@ -13,6 +13,29 @@
   <link rel="icon" href="logo.png">
 </head>
 <body>
+  <!-- Find & Replace Panel -->
+  <div id="findReplacePanel" class="find-replace-panel" style="display: none;">
+    <div class="find-replace-header">
+      <span id="findReplaceTitle">Find & Replace</span>
+      <button id="closeFindReplaceBtn" class="btn-icon" title="Close">✕</button>
+    </div>
+    <div class="find-replace-body">
+      <div class="input-group">
+        <input type="text" id="findInput" placeholder="Find..." autocomplete="off" />
+        <span id="findMatchCount" class="match-count">0/0</span>
+      </div>
+      <div class="input-group" id="replaceGroup">
+        <input type="text" id="replaceInput" placeholder="Replace with..." autocomplete="off" />
+      </div>
+      <div class="find-replace-actions">
+        <button id="findPrevBtn" class="btn-secondary" title="Previous match">↑</button>
+        <button id="findNextBtn" class="btn-secondary" title="Next match">↓</button>
+        <button id="replaceBtn" class="btn-secondary" title="Replace current match">Replace</button>
+        <button id="replaceAllBtn" class="btn-secondary" title="Replace all matches">Replace All</button>
+      </div>
+    </div>
+  </div>
+
   <div id="app">
 
     <!-- ═══════════════ Nav Rail ═══════════════ -->
@@ -33,13 +56,6 @@
         </button>
       </div>
       <div class="rail-bottom">
-        <button id="whatsNewRailBtn" class="rail-tab" onclick="openWhatsNew()" title="What's New (Changelog)">
-          <span class="rail-icon">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M12 3l1.912 5.813a2 2 0 001.272 1.272L21 12l-5.813 1.912a2 2 0 00-1.272 1.272L12 21l-1.912-5.813a2 2 0 00-1.272-1.272L3 12l5.813-1.912a2 2 0 001.272-1.272L12 3z"></path>
-            </svg>
-          </span>
-        </button>
       </div>
     </nav>
 
@@ -80,7 +96,13 @@
       <!-- Floating Header (Action Bar) -->
       <header class="editor-header">
         <div class="editor-header-left">
-          <!-- empty for now or breadcrumbs -->
+          <button id="toggleSidebarsBtn" class="btn-icon" title="Toggle Fullscreen (Focus Mode)" style="padding: 6px;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+              <line x1="9" y1="3" x2="9" y2="21"></line>
+              <line x1="15" y1="3" x2="15" y2="21"></line>
+            </svg>
+          </button>
         </div>
         <div class="editor-header-right">
           <button id="openTeleprompterRailBtn" class="btn-icon" title="Teleprompter" style="display:none; padding: 6px;">
@@ -220,6 +242,15 @@
               </div>
               <div class="toolbar-divider"></div>
               <div class="toolbar-group">
+                <button class="toolbar-btn" id="openFindBtn" title="Find & Replace (Ctrl+F / Ctrl+H)">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                  </svg>
+                </button>
+              </div>
+              <div class="toolbar-divider"></div>
+              <div class="toolbar-group">
                 <button class="toolbar-btn" id="lineSpacingBtn" title="Toggle Double Spacing">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="4" x2="12" y2="20"></line><polyline points="8 8 12 4 16 8"></polyline><polyline points="8 16 12 20 16 16"></polyline></svg>
                 </button>
@@ -259,38 +290,38 @@
             <div id="tab-insert" class="tools-panel active">
               <div class="insert-section">
                 <span class="insert-section-title">Basic</span>
-                <button class="insert-block-btn" data-block="text">
+                <button class="insert-block-btn" data-block="text" draggable="true">
                   <span class="block-icon">Aa</span> Text
                 </button>
               </div>
 
               <div class="insert-section">
                 <span class="insert-section-title">Media</span>
-                <button class="insert-block-btn" data-block="image">
+                <button class="insert-block-btn" data-block="image" draggable="true">
                   <span class="block-icon">🖼️</span> Image
                 </button>
-                <button class="insert-block-btn" data-block="broll">
+                <button class="insert-block-btn" data-block="broll" draggable="true">
                   <span class="block-icon">🎥</span> B-Roll Marker
                 </button>
               </div>
 
               <div class="insert-section">
                 <span class="insert-section-title">Advanced</span>
-                <button class="insert-block-btn" data-block="code">
+                <button class="insert-block-btn" data-block="code" draggable="true">
                   <span class="block-icon">{' '}</span> Code Block
                 </button>
               </div>
 
               <div class="insert-section">
                 <span class="insert-section-title">Collections</span>
-                <button class="insert-block-btn" data-block="table">
+                <button class="insert-block-btn" data-block="table" draggable="true">
                   <span class="block-icon">▦</span> Table
                 </button>
               </div>
 
               <div class="insert-section">
                 <span class="insert-section-title">Divider</span>
-                <button class="insert-block-btn" data-block="line">
+                <button class="insert-block-btn" data-block="line" draggable="true">
                   <span class="block-icon">―</span> Horizontal Line
                 </button>
               </div>
@@ -834,8 +865,23 @@
         <h3>📅 Set Publish Date</h3>
         <button class="modal-close" data-modal="dateModal">✕</button>
       </div>
-      <div class="modal-body">
-        <input type="date" id="publishDateInput" class="date-input">
+      <div class="modal-body custom-date-modal-body">
+        <div id="customDatePicker" class="custom-date-picker">
+          <div class="cdp-header">
+            <button id="cdpPrevMonth" class="btn-icon">←</button>
+            <span id="cdpMonthYear">August 2026</span>
+            <button id="cdpNextMonth" class="btn-icon">→</button>
+          </div>
+          <div class="cdp-weekdays">
+            <span>Su</span><span>Mo</span><span>Tu</span><span>We</span><span>Th</span><span>Fr</span><span>Sa</span>
+          </div>
+          <div id="cdpGrid" class="cdp-grid">
+            <!-- Days injected via JS -->
+          </div>
+        </div>
+        
+        <!-- The animated tooltip -->
+        <div id="cdpTooltip" class="cdp-tooltip"></div>
       </div>
       <div class="modal-footer">
         <button id="removeDateBtn" class="btn-secondary">Remove Date</button>
@@ -949,94 +995,10 @@
     <button class="ctx-menu-item" data-action="delete-part" style="color: #ff6b81;">🗑️&nbsp;&nbsp;Delete Part</button>
   </div>
 
-  <!-- Find & Replace Panel -->
-  <div id="findReplacePanel" class="find-replace-panel" hidden>
-    <div class="find-replace-header">
-      <span id="findReplaceTitle">Find & Replace</span>
-      <button id="closeFindReplaceBtn" class="btn-icon">✕</button>
-    </div>
-    <div class="find-replace-body">
-      <div class="input-group">
-        <input type="text" id="findInput" placeholder="Find..." />
-        <span id="findMatchCount" class="match-count">0/0</span>
-      </div>
-      <div class="input-group" id="replaceGroup">
-        <input type="text" id="replaceInput" placeholder="Replace with..." />
-      </div>
-      <div class="find-replace-actions">
-        <button id="findPrevBtn" class="btn-secondary" title="Previous match">↑</button>
-        <button id="findNextBtn" class="btn-secondary" title="Next match">↓</button>
-        <button id="replaceBtn" class="btn-secondary" title="Replace current match">Replace</button>
-        <button id="replaceAllBtn" class="btn-secondary" title="Replace all matches">Replace All</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ═══════════════ What's New Modal ═══════════════ -->
-  <div id="whatsNewModal" class="whats-new-overlay" hidden>
-    <div class="whats-new-dialog">
-      <div class="whats-new-header">
-        <div class="whats-new-badge">v1.12.0</div>
-        <div>
-          <h2 class="whats-new-title">What's New in Script Manager</h2>
-          <p class="whats-new-version">Version 1.12.0 — Major Update (August 2026)</p>
-        </div>
-        <button id="whatsNewCloseBtn" class="whats-new-close" onclick="closeWhatsNew()">✕</button>
-      </div>
-      <div class="whats-new-body">
-        <div class="wn-section">
-          <div class="wn-section-icon">💾</div>
-          <div class="wn-section-content">
-            <h3>Automatic Backup & System Tray Execution</h3>
-            <p>App bandh hone par ab auto-backup nahi rukega! Window close karne par app <b>System Tray</b> mein minimize ho jata hai aur background mein aapka data automatically configured frequency (1 Hr, 6 Hrs, Daily) par safe folder mein backup karta rehta hai. PC storage ko safe rakhne ke liye sirf <b>latest 5 auto-backups</b> hi manage hote hain.</p>
-          </div>
-        </div>
-        <div class="wn-section">
-          <div class="wn-section-icon">🏷️</div>
-          <div class="wn-section-content">
-            <h3>Customizable Script Part Names</h3>
-            <p>Right-click karke <b>"Make Part"</b> select karne par ab aap script parts ko apna manpasand custom naam de sakte hain (jaise <i>"Intro"</i>, <i>"Scene 1"</i>, <i>"Outro"</i>) instead of default numbers.</p>
-          </div>
-        </div>
-        <div class="wn-section">
-          <div class="wn-section-icon">🎨</div>
-          <div class="wn-section-content">
-            <h3>Editor Focus & Paste Outlines Fixed</h3>
-            <p>ChatGPT ya kisi bhi site se copy-paste kiye hue elements par aane wale blue/grey borders aur editor focus rings ko strictly remove kar diya gaya hai for a completely clean dark writing experience.</p>
-          </div>
-        </div>
-        <div class="wn-section">
-          <div class="wn-section-icon">📅</div>
-          <div class="wn-section-content">
-            <h3>Industry-Level Glass Calendar & Smart Filtering</h3>
-            <p>Calendar view ab glassmorphism UI mein upgraded hai. Quick <b>"Today"</b> jump button, accurate local timezone logic, aur finished/published scripts ka upcoming schedule se automatic removal.</p>
-          </div>
-        </div>
-        <div class="wn-section">
-          <div class="wn-section-icon">⚡</div>
-          <div class="wn-section-content">
-            <h3>Fast Event-Delegated Context Menu</h3>
-            <p>Standalone fast context menu with Text Highlight, Case Toggle, Clear Formatting, Table Insert/Delete, and Part creation.</p>
-          </div>
-        </div>
-        <div class="wn-section">
-          <div class="wn-section-icon">🎭</div>
-          <div class="wn-section-content">
-            <h3>Hollywood Character Management & Visual Network Graph</h3>
-            <p>Editor mein <b>@mention</b> character system, interactive network graph, character relationship linking, aur detailed character profile cards.</p>
-          </div>
-        </div>
-      </div>
-      <div class="whats-new-footer">
-        <button id="whatsNewGotItBtn" class="whats-new-cta" onclick="closeWhatsNew()">Got it, Let's go! 🚀</button>
-      </div>
-    </div>
-  </div>
-
-  <script src="components/characters/vis-network.min.js"></script>
-  <script src="components/characters/characters.js"></script>
-  <script src="components/characters/editor-mention.js"></script>
-  <script src="app.js"></script>
-  <script src="context-menu.js"></script>
+  <script src="components/characters/vis-network.min.js" defer></script>
+  <script src="components/characters/characters.js" defer></script>
+  <script src="components/characters/editor-mention.js" defer></script>
+  <script src="app.js" defer></script>
+  <script src="context-menu.js" defer></script>
 </body>
 </html>

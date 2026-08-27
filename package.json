@@ -1,6 +1,6 @@
 {
   "name": "script-manager",
-  "version": "1.12.0",
+  "version": "1.14.4",
   "description": "A premium dark-mode app to organize video scripts, thumbnails, and schedule publish dates.",
   "main": "main.js",
   "scripts": {
@@ -35,6 +35,7 @@
       "target": "nsis",
       "icon": "icon1.ico"
     },
+    "asar": false,
     "nsis": {
       "oneClick": true,
       "perMachine": false,

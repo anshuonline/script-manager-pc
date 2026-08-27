@@ -366,6 +366,11 @@
 
   let savedRange = null; // the selection range at the moment the user right-clicked
 
+  // To prevent the context menu from stealing selection on click:
+  menu.addEventListener('mousedown', (e) => {
+    e.preventDefault(); // Prevents selection from moving to the menu
+  });
+
   function showPartPrompt(defaultName) {
     partInput.value = defaultName;
     overlay.classList.add('ctx-modal-visible');
@@ -438,8 +443,9 @@
     wrapper.setAttribute('data-part-name', name);
     wrapper.setAttribute('data-part-color', String(colorIndex + 1));
 
-    // Extract selected content
-    const fragment = range.extractContents();
+    // Clone selected content instead of extracting it, so the selection remains intact
+    // and insertHTML can cleanly replace it without the caret snapping into adjacent parts.
+    const fragment = range.cloneContents();
     
     // If the extracted fragment is just text, wrap it in a <p> so it formats nicely inside the part.
     // If it already has block elements, we leave it as is.
@@ -472,6 +478,32 @@
     // Insert cleanly via insertHTML so the browser fixes invalid nesting (e.g. div inside p)
     const htmlString = wrapper.outerHTML;
     document.execCommand('insertHTML', false, htmlString);
+
+    // CRITICAL: Chrome's insertHTML notoriously injects inline styles like 
+    // <span style="background-color: ..."> to text or paragraphs. We MUST clean this up!
+    const editor = document.getElementById('editor');
+    if (editor) {
+      editor.querySelectorAll('[style]').forEach(el => {
+        // Strip background colors that are not the highlight color (#ffe066 / rgb(255, 224, 102))
+        const bg = el.style.backgroundColor;
+        if (bg && !bg.includes('255, 224, 102') && !bg.includes('ffe066') && !bg.includes('yellow')) {
+          el.style.backgroundColor = '';
+        }
+        if (el.style.lineHeight) el.style.lineHeight = '';
+        if (el.style.fontSize) el.style.fontSize = '';
+        if (el.style.fontFamily) el.style.fontFamily = '';
+        if (el.style.color) el.style.color = '';
+        
+        // If it's a span and has no other styles, unwrap it to keep DOM clean
+        if (el.tagName === 'SPAN' && !el.getAttribute('style')) {
+          const parent = el.parentNode;
+          if (parent) {
+            while (el.firstChild) parent.insertBefore(el.firstChild, el);
+            parent.removeChild(el);
+          }
+        }
+      });
+    }
 
     sel.removeAllRanges();
 
@@ -632,13 +664,12 @@
 
     switch (action) {
       case 'makePart': {
-        const sel = window.getSelection();
-        if (!sel || sel.rangeCount === 0 || sel.isCollapsed) {
+        if (!savedRange) {
           showErrorPrompt("Please select some text first.");
           break;
         }
 
-        const range = sel.getRangeAt(0);
+        const range = savedRange;
 
         // Check if selection is already inside a part
         let node = range.commonAncestorContainer;

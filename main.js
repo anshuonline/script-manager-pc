@@ -44,6 +44,7 @@ function createWindow() {
 
   // Load the app
   mainWindow.loadFile('index.html');
+  // mainWindow.webContents.openDevTools();
 
   // Show window when ready to avoid white flash
   mainWindow.once('ready-to-show', () => {

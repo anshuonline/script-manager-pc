@@ -655,22 +655,30 @@
       .sort((a, b) => a.publishDate.localeCompare(b.publishDate));
 
     if (upcoming.length === 0) {
-      container.innerHTML = `<div class="upcoming-empty">No upcoming scripts scheduled</div>`;
+      container.innerHTML = `<div class="upcoming-empty">
+        <span class="empty-emoji">🌴</span>
+        <p>No upcoming scripts scheduled</p>
+      </div>`;
       return;
     }
 
     container.innerHTML = upcoming
       .map(
         (s) => `
-      <div class="upcoming-item" data-script-id="${s.id}">
-        <div class="upcoming-item-date">${formatShortDate(s.publishDate)}</div>
-        <div class="upcoming-item-thumb">
-          ${s.coverImage ? `<img src="${s.coverImage}" alt="">` : '📄'}
+      <div class="upcoming-item-premium" data-script-id="${s.id}">
+        <div class="upcoming-item-left">
+          <div class="upcoming-item-thumb">
+            ${s.coverImage ? `<img src="${s.coverImage}" alt="">` : '📄'}
+          </div>
+          <div class="upcoming-item-info">
+            <div class="upcoming-item-title">${s.title || 'Untitled Script'}</div>
+            <div class="upcoming-item-meta">
+              <span class="status-dot ${s.status || 'pending'}"></span>
+              <span class="upcoming-item-date">${formatShortDate(s.publishDate)}</span>
+            </div>
+          </div>
         </div>
-        <div class="upcoming-item-title">
-          <div style="display:inline-block; margin-right:6px;" class="status-dot ${s.status || 'pending'}"></div>
-          ${s.title || 'Untitled Script'}
-        </div>
+        <button class="btn-mark-done" title="Mark as Finished">✓</button>
       </div>`
       )
       .join('');
@@ -1147,8 +1155,447 @@
     if (modal) modal.hidden = true;
   }
 
+  // ── Find & Replace Logic ──────────────────────────────────
+  function setupFindReplaceListeners() {
+    console.log('[F&R] Setting up Find & Replace listeners...');
+    
+    const panel = document.getElementById('findReplacePanel');
+    const openBtn = document.getElementById('openFindBtn');
+    const closeBtn = document.getElementById('closeFindReplaceBtn');
+    const findInput = document.getElementById('findInput');
+    const replaceInput = document.getElementById('replaceInput');
+    const findNextBtn = document.getElementById('findNextBtn');
+    const findPrevBtn = document.getElementById('findPrevBtn');
+    const replaceBtn = document.getElementById('replaceBtn');
+    const replaceAllBtn = document.getElementById('replaceAllBtn');
+    const matchCountEl = document.getElementById('findMatchCount');
+    const replaceGroup = document.getElementById('replaceGroup');
+    const titleEl = document.getElementById('findReplaceTitle');
+
+    console.log('[F&R] Elements found:', {
+      panel: !!panel, openBtn: !!openBtn, closeBtn: !!closeBtn,
+      findInput: !!findInput, replaceInput: !!replaceInput
+    });
+
+    if (!panel || !openBtn || !findInput) {
+      console.error('[F&R] Critical elements missing! Aborting setup.');
+      return;
+    }
+
+    // Open panel on button click
+    openBtn.addEventListener('click', () => {
+      console.log('[F&R] Open button clicked');
+      showFindPanel(true);
+    });
+
+    // Close panel
+    if (closeBtn) {
+      closeBtn.addEventListener('click', () => {
+        console.log('[F&R] Close button clicked');
+        hideFindPanel();
+      });
+    }
+
+    // Find input events
+    findInput.addEventListener('input', () => refreshMatchCount());
+    findInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        doFind(e.shiftKey);
+      }
+      if (e.key === 'Escape') {
+        hideFindPanel();
+      }
+    });
+
+    // Prevent buttons from stealing focus from editor, AND trigger action instantly
+    if (findNextBtn) findNextBtn.addEventListener('mousedown', (e) => { e.preventDefault(); doFind(false); });
+    if (findPrevBtn) findPrevBtn.addEventListener('mousedown', (e) => { e.preventDefault(); doFind(true); });
+
+    // Replace single
+    if (replaceBtn) {
+      replaceBtn.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        const q = findInput.value;
+        const r = replaceInput ? replaceInput.value : '';
+        if (!q) return;
+        const sel = window.getSelection();
+        if (sel && sel.toString().toLowerCase() === q.toLowerCase()) {
+          document.execCommand('insertText', false, r);
+        }
+        doFind(false);
+      });
+    }
+
+    // Replace all
+    if (replaceAllBtn) {
+      replaceAllBtn.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        const q = findInput.value;
+        const r = replaceInput ? replaceInput.value : '';
+        if (!q) return;
+
+        const editorEl = document.getElementById('editor');
+        if (!editorEl) return;
+        editorEl.focus();
+
+        let count = 0;
+        function walkAndReplace(node) {
+          if (node.nodeType === 3) {
+            const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const regex = new RegExp(escaped, 'gi');
+            if (regex.test(node.nodeValue)) {
+              const m = node.nodeValue.match(new RegExp(escaped, 'gi'));
+              if (m) count += m.length;
+              node.nodeValue = node.nodeValue.replace(new RegExp(escaped, 'gi'), r);
+            }
+          } else if (node.nodeType === 1 && node.nodeName !== 'SCRIPT' && node.nodeName !== 'STYLE') {
+            Array.from(node.childNodes).forEach(walkAndReplace);
+          }
+        }
+        walkAndReplace(editorEl);
+        showToast(`Replaced ${count} occurrences`, 'success');
+        refreshMatchCount();
+      });
+    }
+
+    // Keyboard shortcuts: Ctrl+F and Ctrl+H
+    document.addEventListener('keydown', (e) => {
+      if (e.ctrlKey && e.key && e.key.toLowerCase() === 'f') {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log('[F&R] Ctrl+F pressed');
+        showFindPanel(false);
+      }
+      if (e.ctrlKey && e.key && e.key.toLowerCase() === 'h') {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log('[F&R] Ctrl+H pressed');
+        showFindPanel(true);
+      }
+    }, true); // Use capture phase to beat other handlers
+
+    // ─── Helper Functions ───
+    function showFindPanel(withReplace) {
+      console.log('[F&R] showFindPanel called, withReplace:', withReplace);
+      
+      if (state.currentView !== 'editor') {
+        showToast('Can only search in editor view', 'error');
+        return;
+      }
+
+      // Force show the panel
+      panel.style.cssText = 'display: flex !important; position: fixed !important; top: 16px !important; right: 24px !important; z-index: 999999 !important; opacity: 1 !important; width: 320px !important; pointer-events: auto !important;';
+      
+      if (withReplace) {
+        if (replaceGroup) replaceGroup.style.display = 'flex';
+        if (replaceBtn) replaceBtn.style.display = 'block';
+        if (replaceAllBtn) replaceAllBtn.style.display = 'block';
+        if (titleEl) titleEl.textContent = 'Find & Replace';
+      } else {
+        if (replaceGroup) replaceGroup.style.display = 'none';
+        if (replaceBtn) replaceBtn.style.display = 'none';
+        if (replaceAllBtn) replaceAllBtn.style.display = 'none';
+        if (titleEl) titleEl.textContent = 'Find';
+      }
+
+      findInput.focus();
+      findInput.select();
+      refreshMatchCount();
+      console.log('[F&R] Panel should now be visible. Computed display:', window.getComputedStyle(panel).display);
+    }
+
+    function hideFindPanel() {
+      panel.style.cssText = 'display: none !important;';
+    }
+
+    function doFind(backwards) {
+      const q = findInput.value;
+      if (!q) return;
+
+      const editorEl = document.getElementById('editor');
+      if (!editorEl) return;
+      editorEl.focus();
+
+      let found = false;
+      let attempts = 0;
+      let lastAnchorNode = null;
+      let lastAnchorOffset = null;
+
+      while (attempts < 100) {
+        found = window.find(q, false, backwards, true, false, false, false);
+        if (!found) {
+          const sel = window.getSelection();
+          sel.removeAllRanges();
+          const range = document.createRange();
+          range.selectNodeContents(editorEl);
+          range.collapse(!backwards);
+          sel.addRange(range);
+          found = window.find(q, false, backwards, true, false, false, false);
+        }
+
+        if (!found) break;
+
+        const sel = window.getSelection();
+        if (sel.anchorNode === lastAnchorNode && sel.anchorOffset === lastAnchorOffset) break;
+        lastAnchorNode = sel.anchorNode;
+        lastAnchorOffset = sel.anchorOffset;
+
+        if (editorEl.contains(sel.anchorNode)) {
+          // Auto-scroll to matched text
+          if (sel.rangeCount > 0) {
+            let node = sel.anchorNode;
+            if (node.nodeType === 3) node = node.parentNode;
+            if (node && node.scrollIntoView) {
+              node.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+          }
+          break;
+        }
+        attempts++;
+      }
+
+      if (attempts >= 100 || !found) {
+        window.getSelection().removeAllRanges();
+      }
+      refreshMatchCount();
+    }
+
+    function refreshMatchCount() {
+      const q = findInput.value;
+      if (!matchCountEl) return;
+      if (!q) {
+        matchCountEl.textContent = '0/0';
+        return;
+      }
+      const editorEl = document.getElementById('editor');
+      if (!editorEl) return;
+      
+      const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const regex = new RegExp(escaped, 'gi');
+      
+      let totalMatches = 0;
+      function countMatchesInNode(node) {
+        if (node.nodeType === 3) {
+          const m = node.nodeValue.match(regex);
+          if (m) totalMatches += m.length;
+        } else if (node.nodeType === 1 && node.nodeName !== 'SCRIPT' && node.nodeName !== 'STYLE') {
+          Array.from(node.childNodes).forEach(countMatchesInNode);
+        }
+      }
+      countMatchesInNode(editorEl);
+
+      if (totalMatches === 0) {
+        matchCountEl.textContent = '0/0';
+        return;
+      }
+
+      let currentIndex = '?';
+      const sel = window.getSelection();
+      if (sel.rangeCount > 0 && editorEl.contains(sel.anchorNode)) {
+        try {
+          const range = sel.getRangeAt(0);
+          const preRange = document.createRange();
+          preRange.selectNodeContents(editorEl);
+          preRange.setEnd(range.startContainer, range.startOffset);
+          
+          let preMatchesCount = 0;
+          function countPreMatches(node) {
+            if (node.nodeType === 3) {
+              const m = node.nodeValue.match(regex);
+              if (m) preMatchesCount += m.length;
+            } else if (node.nodeType === 1 && node.nodeName !== 'SCRIPT' && node.nodeName !== 'STYLE') {
+              Array.from(node.childNodes).forEach(countPreMatches);
+            }
+          }
+          
+          // To safely count pre-matches without heavy cloning, 
+          // fallback to textContent for the range before cursor.
+          const preText = preRange.cloneContents().textContent || '';
+          const preMatches = preText.match(regex);
+          currentIndex = (preMatches ? preMatches.length : 0) + 1;
+          if (currentIndex > totalMatches) currentIndex = totalMatches;
+        } catch (e) {}
+      }
+
+      matchCountEl.textContent = `${currentIndex}/${totalMatches}`;
+    }
+
+    console.log('[F&R] Setup complete!');
+  }
+
+  // ── Custom Date Picker Modal ────────────────────────────────────────
+  let cdpCurrentDate = new Date();
+  let cdpSelectedDateStr = null;
+  let cdpTooltipTimeout = null;
+
+  function renderCustomDatePicker() {
+    const year = cdpCurrentDate.getFullYear();
+    const month = cdpCurrentDate.getMonth();
+    
+    const titleEl = $('#cdpMonthYear');
+    if (titleEl) {
+      titleEl.textContent = cdpCurrentDate.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+    }
+
+    const gridEl = $('#cdpGrid');
+    if (!gridEl) return;
+
+    const firstDay = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const daysInPrevMonth = new Date(year, month, 0).getDate();
+    const today = new Date();
+
+    let html = '';
+
+    // Prev month days
+    for (let i = firstDay - 1; i >= 0; i--) {
+      const day = daysInPrevMonth - i;
+      html += `<div class="cdp-day other-month">${day}</div>`;
+    }
+
+    // Current month days
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      const isToday = today.getFullYear() === year && today.getMonth() === month && today.getDate() === d;
+      const isSelected = dateStr === cdpSelectedDateStr;
+      
+      const scriptsOnDay = state.scripts.filter((s) => s.publishDate === dateStr);
+      let dotsHtml = '';
+      let tooltipData = '';
+      if (scriptsOnDay.length > 0) {
+        dotsHtml = '<div class="cdp-dots">';
+        // Cap dots at 3 so it doesn't overflow UI
+        for (let i = 0; i < Math.min(scriptsOnDay.length, 3); i++) {
+          dotsHtml += '<div class="cdp-dot"></div>';
+        }
+        dotsHtml += '</div>';
+        // Encode data for tooltip
+        tooltipData = `data-scripts='${JSON.stringify(scriptsOnDay.map(s => ({id: s.id, title: s.title || 'Untitled'}))).replace(/'/g, "&#39;")}'`;
+      }
+
+      html += `
+        <div class="cdp-day ${isToday ? 'today' : ''} ${isSelected ? 'selected' : ''}" data-date="${dateStr}" ${tooltipData}>
+          ${d}
+          ${dotsHtml}
+        </div>
+      `;
+    }
+
+    // Next month days
+    const totalCells = firstDay + daysInMonth;
+    const remaining = totalCells % 7 === 0 ? 0 : 7 - (totalCells % 7);
+    for (let d = 1; d <= remaining; d++) {
+      html += `<div class="cdp-day other-month">${d}</div>`;
+    }
+
+    gridEl.innerHTML = html;
+  }
+
+  function setupCustomDatePicker() {
+    const prevBtn = $('#cdpPrevMonth');
+    if (prevBtn) {
+      prevBtn.addEventListener('click', () => {
+        cdpCurrentDate.setMonth(cdpCurrentDate.getMonth() - 1);
+        renderCustomDatePicker();
+      });
+    }
+    const nextBtn = $('#cdpNextMonth');
+    if (nextBtn) {
+      nextBtn.addEventListener('click', () => {
+        cdpCurrentDate.setMonth(cdpCurrentDate.getMonth() + 1);
+        renderCustomDatePicker();
+      });
+    }
+
+    const grid = $('#cdpGrid');
+    const tooltip = $('#cdpTooltip');
+    
+    if (grid) {
+      grid.addEventListener('click', (e) => {
+        // If clicking a tooltip item, don't trigger day click
+        if (e.target.closest('.cdp-tooltip')) return;
+        
+        const dayEl = e.target.closest('.cdp-day[data-date]');
+        if (dayEl) {
+          cdpSelectedDateStr = dayEl.dataset.date;
+          renderCustomDatePicker();
+          
+          // Re-trigger tooltip if it has scripts
+          if (dayEl.hasAttribute('data-scripts')) {
+            showTooltipForDay(grid.querySelector(`.cdp-day[data-date="${cdpSelectedDateStr}"]`));
+          } else {
+            tooltip.classList.remove('visible');
+          }
+        }
+      });
+
+      // Hover for tooltip using delegation but more robust
+      grid.addEventListener('mouseover', (e) => {
+        const dayEl = e.target.closest('.cdp-day[data-scripts]');
+        if (dayEl) {
+          showTooltipForDay(dayEl);
+        }
+      });
+      
+      grid.addEventListener('mouseout', (e) => {
+        const dayEl = e.target.closest('.cdp-day[data-scripts]');
+        if (dayEl) {
+          const related = e.relatedTarget;
+          // Hide only if we are actually leaving the day cell and not entering the tooltip
+          if (!dayEl.contains(related) && (!tooltip.contains(related) && related !== tooltip)) {
+            cdpTooltipTimeout = setTimeout(() => {
+              tooltip.classList.remove('visible');
+            }, 100);
+          }
+        }
+      });
+    }
+
+    function showTooltipForDay(dayEl) {
+      if (!dayEl || !tooltip) return;
+      clearTimeout(cdpTooltipTimeout);
+      const scripts = JSON.parse(dayEl.dataset.scripts.replace(/&#39;/g, "'"));
+      tooltip.innerHTML = scripts.map(s => 
+        `<div class="cdp-tooltip-item" data-id="${s.id}">${s.title}</div>`
+      ).join('');
+      
+      // Position it exactly centered above the day
+      const rect = dayEl.getBoundingClientRect();
+      const modalBodyRect = dayEl.closest('.modal-body').getBoundingClientRect();
+      
+      const left = rect.left - modalBodyRect.left + (rect.width / 2);
+      const bottom = modalBodyRect.bottom - rect.top + 8;
+      
+      tooltip.style.left = `${left}px`;
+      tooltip.style.bottom = `${bottom}px`;
+      
+      tooltip.classList.add('visible');
+    }
+
+    if (tooltip) {
+      tooltip.addEventListener('mouseover', () => clearTimeout(cdpTooltipTimeout));
+      tooltip.addEventListener('mouseout', () => {
+        cdpTooltipTimeout = setTimeout(() => {
+          tooltip.classList.remove('visible');
+        }, 100);
+      });
+      
+      // Click script to navigate
+      tooltip.addEventListener('click', (e) => {
+        const item = e.target.closest('.cdp-tooltip-item');
+        if (item) {
+          closeModal('dateModal');
+          selectScript(item.dataset.id);
+          tooltip.classList.remove('visible');
+        }
+      });
+    }
+  }
+
   // ── Event Listeners ────────────────────────────────────────
   function setupEventListeners() {
+    setupFindReplaceListeners();
     // Parts List Drag & Drop Reordering
     const partsList = $('#partsList');
     if (partsList) {
@@ -1894,18 +2341,24 @@
     // Publish date
     $('#publishDateBtn').addEventListener('click', () => {
       const script = getActiveScript();
-      const dateInput = $('#publishDateInput');
-      if (script && dateInput) {
-        dateInput.value = script.publishDate || '';
+      if (script) {
+        cdpSelectedDateStr = script.publishDate || null;
+        if (cdpSelectedDateStr) {
+          const parts = cdpSelectedDateStr.split('-');
+          cdpCurrentDate = new Date(parts[0], parseInt(parts[1]) - 1, 1);
+        } else {
+          cdpCurrentDate = new Date();
+          cdpCurrentDate.setDate(1);
+        }
       }
+      renderCustomDatePicker();
       openModal('dateModal');
     });
 
     $('#saveDateBtn').addEventListener('click', () => {
       const script = getActiveScript();
-      const dateInput = $('#publishDateInput');
-      if (script && dateInput) {
-        script.publishDate = dateInput.value || null;
+      if (script) {
+        script.publishDate = cdpSelectedDateStr || null;
         script.updatedAt = new Date().toISOString();
         save();
         render();
@@ -1953,8 +2406,24 @@
 
     // Upcoming items click
     $('#upcomingList').addEventListener('click', (e) => {
-      const item = e.target.closest('.upcoming-item');
-      if (item) selectScript(item.dataset.scriptId);
+      const item = e.target.closest('.upcoming-item-premium');
+      if (!item) return;
+      
+      const scriptId = item.dataset.scriptId;
+      
+      if (e.target.closest('.btn-mark-done')) {
+        e.stopPropagation();
+        const script = state.scripts.find(s => s.id === scriptId);
+        if (script) {
+          script.status = 'finished';
+          save();
+          renderCalendar();
+          showToast('Script marked as finished!');
+        }
+        return;
+      }
+      
+      selectScript(scriptId);
     });
 
     // Modal close buttons
@@ -2010,24 +2479,15 @@
         }
       }
 
-      // Ctrl+F — Find
-      if (e.ctrlKey && key === 'f') {
-        e.preventDefault();
-        openFindReplace(false);
-      }
-
-      // Ctrl+H — Find & Replace
-      if (e.ctrlKey && key === 'h') {
-        e.preventDefault();
-        openFindReplace(true);
-      }
-
       // Escape — close modals, teleprompter, and find/replace
       if (e.key === 'Escape') {
         $$('.modal-overlay').forEach((m) => (m.hidden = true));
         closeTeleprompter();
         const frPanel = $('#findReplacePanel');
-        if (frPanel) frPanel.hidden = true;
+        if (frPanel) {
+          frPanel.style.setProperty('display', 'none', 'important');
+          frPanel.setAttribute('hidden', '');
+        }
       }
 
       // Spacebar for teleprompter play/pause
@@ -2075,205 +2535,10 @@
       }
     }, { passive: false });
 
-    // Find & Replace UI Events
-    $('#closeFindReplaceBtn').addEventListener('click', () => {
-      $('#findReplacePanel').hidden = true;
-    });
-
-    $('#findInput').addEventListener('input', () => updateFindMatchCount());
-    $('#findInput').addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        doFind(e.shiftKey);
-      }
-    });
-
-    $('#replaceBtn').addEventListener('mousedown', (e) => e.preventDefault());
-    $('#replaceAllBtn').addEventListener('mousedown', (e) => e.preventDefault());
-    $('#findNextBtn').addEventListener('mousedown', (e) => e.preventDefault());
-    $('#findPrevBtn').addEventListener('mousedown', (e) => e.preventDefault());
-
-    $('#findNextBtn').addEventListener('click', () => doFind(false));
-    $('#findPrevBtn').addEventListener('click', () => doFind(true));
-    
-    $('#replaceBtn').addEventListener('click', () => {
-      const q = $('#findInput').value;
-      const r = $('#replaceInput').value;
-      if (!q) return;
-      
-      // If we have a selection and it matches the query, replace it
-      const selection = window.getSelection();
-      if (selection && selection.toString().toLowerCase() === q.toLowerCase()) {
-        document.execCommand('insertText', false, r);
-      }
-      doFind(false);
-    });
-
-    $('#replaceAllBtn').addEventListener('click', () => {
-      const q = $('#findInput').value;
-      const r = $('#replaceInput').value;
-      if (!q) return;
-
-      $('#editor').focus();
-      // Move cursor to start
-      const sel = window.getSelection();
-      sel.removeAllRanges();
-      const range = document.createRange();
-      range.selectNodeContents($('#editor'));
-      range.collapse(true);
-      sel.addRange(range);
-
-      let count = 0;
-      
-      // A safer approach to replace all text nodes within #editor
-      function replaceTextInNodes(node) {
-        if (node.nodeType === 3) {
-          const regex = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
-          if (regex.test(node.nodeValue)) {
-            const matches = node.nodeValue.match(regex);
-            if (matches) count += matches.length;
-            node.nodeValue = node.nodeValue.replace(regex, r);
-          }
-        } else if (node.nodeType === 1 && node.nodeName !== 'SCRIPT' && node.nodeName !== 'STYLE') {
-          Array.from(node.childNodes).forEach(replaceTextInNodes);
-        }
-      }
-      
-      replaceTextInNodes($('#editor'));
-      
-      showToast(`Replaced ${count} occurrences`, 'success');
-      updateFindMatchCount();
-    });
+      // Find match count update handled in safe setup
   }
 
-  // ── Find & Replace Logic ──────────────────────────────────
-  function openFindReplace(showReplace) {
-    if (state.currentView !== 'editor') {
-      showToast('Can only search in editor view', 'error');
-      return;
-    }
-    
-    try {
-      const panel = $('#findReplacePanel');
-      const replaceGroup = $('#replaceGroup');
-      const title = $('#findReplaceTitle');
-      
-      panel.hidden = false;
-      if (showReplace) {
-        replaceGroup.style.display = 'flex';
-        $('#replaceBtn').style.display = 'block';
-        $('#replaceAllBtn').style.display = 'block';
-        title.textContent = 'Find & Replace';
-      } else {
-        replaceGroup.style.display = 'none';
-        $('#replaceBtn').style.display = 'none';
-        $('#replaceAllBtn').style.display = 'none';
-        title.textContent = 'Find';
-      }
-      
-      const findInput = $('#findInput');
-      findInput.focus();
-      findInput.select();
-      updateFindMatchCount();
-    } catch (err) {
-      showToast('Error opening Find: ' + err.message, 'error');
-    }
-  }
 
-  function doFind(backwards) {
-    const q = $('#findInput').value;
-    if (!q) return;
-    
-    $('#editor').focus();
-    
-    let found = false;
-    let attempts = 0;
-    const maxAttempts = 100; // Reduced to 100 to prevent long freezes
-    let lastAnchorNode = null;
-    let lastAnchorOffset = null;
-
-    while (attempts < maxAttempts) {
-      found = window.find(q, false, backwards, true, false, false, false);
-      if (!found) {
-        const sel = window.getSelection();
-        sel.removeAllRanges();
-        const range = document.createRange();
-        range.selectNodeContents($('#editor'));
-        range.collapse(!backwards);
-        sel.addRange(range);
-        found = window.find(q, false, backwards, true, false, false, false);
-      }
-      
-      if (!found) break;
-
-      const sel = window.getSelection();
-      
-      // If we found the exact same match again (wrap around loop), break out
-      if (sel.anchorNode === lastAnchorNode && sel.anchorOffset === lastAnchorOffset) {
-        break;
-      }
-      lastAnchorNode = sel.anchorNode;
-      lastAnchorOffset = sel.anchorOffset;
-
-      if ($('#editor').contains(sel.anchorNode)) {
-        // Scroll to the matched text
-        if (sel.rangeCount > 0) {
-          let node = sel.anchorNode;
-          if (node.nodeType === 3) { // Text node
-            node = node.parentNode;
-          }
-          if (node && typeof node.scrollIntoView === 'function') {
-            node.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          }
-        }
-        break; // Match is valid
-      }
-      attempts++;
-    }
-
-    if (attempts >= maxAttempts || !found) {
-      window.getSelection().removeAllRanges();
-    }
-    updateFindMatchCount();
-  }
-
-  function updateFindMatchCount() {
-    const q = $('#findInput').value;
-    const countEl = $('#findMatchCount');
-    if (!q) {
-      countEl.textContent = '0/0';
-      return;
-    }
-    const editor = $('#editor');
-    const text = editor.innerText || '';
-    // Escape regex
-    const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const matches = text.match(new RegExp(escaped, 'gi'));
-    
-    if (!matches) {
-      countEl.textContent = '0/0';
-      return;
-    }
-
-    let currentIndex = '?';
-    const sel = window.getSelection();
-    if (sel.rangeCount > 0 && editor.contains(sel.anchorNode)) {
-      const range = sel.getRangeAt(0);
-      const preRange = document.createRange();
-      preRange.selectNodeContents(editor);
-      try {
-        preRange.setEnd(range.startContainer, range.startOffset);
-        const preText = preRange.toString();
-        const preMatches = preText.match(new RegExp(escaped, 'gi'));
-        currentIndex = (preMatches ? preMatches.length : 0) + 1;
-        if (currentIndex > matches.length) currentIndex = matches.length;
-      } catch (e) {
-        // Ignore selection errors
-      }
-    }
-
-    countEl.textContent = `${currentIndex}/${matches.length}`;
-  }
 
   // ── Initialization ─────────────────────────────────────────
   function applyTheme() {
@@ -2292,6 +2557,7 @@
     load();
     render();
     setupEventListeners();
+    setupCustomDatePicker();
     applyTheme();
 
     // Background sync translations for old scripts
@@ -2314,42 +2580,6 @@
     const tpOverlay = $('#teleprompterOverlay');
     if (tpOverlay) tpOverlay.hidden = true;
 
-    // ── What's New Popup (show once per version + on rail button click) ──────────────
-    const CURRENT_VERSION = '1.12.0';
-
-    window.openWhatsNew = function() {
-      const wnModal = $('#whatsNewModal');
-      if (wnModal) {
-        wnModal.removeAttribute('hidden');
-        wnModal.style.display = 'flex';
-      }
-    };
-
-    window.closeWhatsNew = function() {
-      const wnModal = $('#whatsNewModal');
-      if (wnModal) {
-        wnModal.setAttribute('hidden', '');
-        wnModal.style.display = 'none';
-      }
-      localStorage.setItem('sm_seen_version', CURRENT_VERSION);
-    };
-
-    const wnModal = $('#whatsNewModal');
-    if (wnModal) {
-      wnModal.addEventListener('click', (e) => {
-        if (e.target === wnModal) window.closeWhatsNew();
-      });
-
-      const seenVersion = localStorage.getItem('sm_seen_version');
-      if (seenVersion !== CURRENT_VERSION) {
-        setTimeout(() => { window.openWhatsNew(); }, 800);
-      }
-
-      $('#whatsNewRailBtn')?.addEventListener('click', (e) => {
-        e.preventDefault();
-        window.openWhatsNew();
-      });
-    }
 
     // Listen for remote teleprompter commands from mobile app
     window.addEventListener('teleprompter-remote', (e) => {
@@ -2640,6 +2870,125 @@
           document.getElementById('insertImageInput').click();
         }
       });
+
+      // Drag and Drop Logic
+      btn.addEventListener('dragstart', (e) => {
+        e.dataTransfer.setData('application/x-sm-insert-block', btn.dataset.block);
+        document.body.classList.add('dragging-insert-block');
+      });
+
+      btn.addEventListener('dragend', () => {
+        document.body.classList.remove('dragging-insert-block');
+        removeDropIndicator();
+      });
+    });
+
+    // Drop indicator logic for editor
+    let dropIndicator = null;
+
+    function removeDropIndicator() {
+      if (dropIndicator && dropIndicator.parentNode) {
+        dropIndicator.parentNode.removeChild(dropIndicator);
+      }
+      dropIndicator = null;
+    }
+
+    editor.addEventListener('dragover', (e) => {
+      const isInsertBlock = document.body.classList.contains('dragging-insert-block');
+      if (!isInsertBlock) return;
+      e.preventDefault();
+      
+      e.dataTransfer.dropEffect = 'copy';
+
+      // Find insertion point
+      const children = Array.from(editor.childNodes);
+      let closestChild = null;
+      let minDistance = Number.MAX_VALUE;
+
+      children.forEach(child => {
+        if (child.nodeType !== 1) return; // Only Elements
+        if (child === dropIndicator) return;
+        const rect = child.getBoundingClientRect();
+        const yCenter = rect.top + rect.height / 2;
+        const distance = Math.abs(e.clientY - yCenter);
+        if (distance < minDistance) {
+          minDistance = distance;
+          closestChild = child;
+        }
+      });
+
+      if (!dropIndicator) {
+        dropIndicator = document.createElement('div');
+        dropIndicator.className = 'drop-indicator';
+      }
+
+      if (closestChild) {
+        const rect = closestChild.getBoundingClientRect();
+        if (e.clientY < rect.top + rect.height / 2) {
+          editor.insertBefore(dropIndicator, closestChild);
+        } else {
+          if (closestChild.nextSibling) {
+            editor.insertBefore(dropIndicator, closestChild.nextSibling);
+          } else {
+            editor.appendChild(dropIndicator);
+          }
+        }
+      } else {
+        editor.appendChild(dropIndicator);
+      }
+    });
+
+    editor.addEventListener('dragleave', (e) => {
+      if (!editor.contains(e.relatedTarget)) {
+        removeDropIndicator();
+      }
+    });
+
+    editor.addEventListener('drop', (e) => {
+      const blockType = e.dataTransfer.getData('application/x-sm-insert-block');
+      if (!blockType) return;
+      e.preventDefault();
+
+      document.body.classList.remove('dragging-insert-block');
+      
+      const insertNode = document.createElement('div');
+      
+      if (blockType === 'text') {
+        insertNode.innerHTML = '<p><br></p>';
+      } else if (blockType === 'code') {
+        insertNode.innerHTML = `<pre style="background: rgba(0,0,0,0.3); padding: 12px; border-radius: 6px; font-family: monospace; border: 1px solid var(--border);"><code>// Code here...</code></pre><p><br></p>`;
+      } else if (blockType === 'table') {
+        insertNode.innerHTML = `
+          <table style="width: 100%; border-collapse: collapse; margin: 16px 0;">
+            <tr><th style="border: 1px solid var(--border); padding: 8px; background: rgba(255,255,255,0.05);">Header 1</th><th style="border: 1px solid var(--border); padding: 8px; background: rgba(255,255,255,0.05);">Header 2</th></tr>
+            <tr><td style="border: 1px solid var(--border); padding: 8px;">Data</td><td style="border: 1px solid var(--border); padding: 8px;">Data</td></tr>
+            <tr><td style="border: 1px solid var(--border); padding: 8px;">Data</td><td style="border: 1px solid var(--border); padding: 8px;">Data</td></tr>
+          </table><p><br></p>`;
+      } else if (blockType === 'line') {
+        insertNode.innerHTML = '<hr style="border: 0; border-top: 1px solid var(--border); margin: 24px 0;"><p><br></p>';
+      } else if (blockType === 'broll') {
+        insertNode.innerHTML = `<span contenteditable="false" style="display: inline-flex; align-items: center; background: rgba(110, 106, 255, 0.15); color: #8e8aff; border: 1px solid rgba(110, 106, 255, 0.3); border-radius: 4px; padding: 2px 8px; font-size: 13px; font-weight: 600; font-family: monospace; user-select: all;">🎥 B-ROLL</span>&nbsp;`;
+      }
+
+      if (blockType !== 'image') {
+        const frag = document.createDocumentFragment();
+        while (insertNode.firstChild) {
+          frag.appendChild(insertNode.firstChild);
+        }
+        
+        if (dropIndicator && dropIndicator.parentNode === editor) {
+          editor.replaceChild(frag, dropIndicator);
+          dropIndicator = null;
+        } else {
+          editor.appendChild(frag);
+        }
+        
+        saveCurrentEditorContent();
+        updatePartsSidebar();
+      } else {
+        removeDropIndicator();
+        document.getElementById('insertImageInput').click();
+      }
     });
 
     // Image Input Handle
@@ -3443,10 +3792,20 @@
     }
   });
 
+  function setupSidebarToggle() {
+    const toggleBtn = $('#toggleSidebarsBtn');
+    if (toggleBtn) {
+      toggleBtn.addEventListener('click', () => {
+        document.body.classList.toggle('sidebars-hidden');
+      });
+    }
+  }
+
   document.addEventListener('DOMContentLoaded', () => {
     try {
       init();
       setupToolsSidebar();
+      setupSidebarToggle();
       setupStatsDropdowns();
       initRipples();
     } catch (err) {
