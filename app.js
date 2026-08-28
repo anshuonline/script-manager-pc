@@ -387,12 +387,14 @@
       }
       
       if (!script.sections) script.sections = [];
-      const sectionName = await showCustomPrompt('Enter section name:', 'New Section');
-      if (!sectionName) return; // cancelled
+      
+      // Auto-generate name — no modal needed
+      const sectionNumber = script.sections.length + 1;
+      const sectionName = 'Section ' + sectionNumber;
 
       const newSection = {
         id: generateId(),
-        name: sectionName.trim() || 'New Section',
+        name: sectionName,
         content: ''
       };
       
@@ -406,10 +408,14 @@
       
       save();
       render();
+      showToast('Section "' + sectionName + '" created', 'success');
     } catch (err) {
-      if (typeof showToast === 'function') showToast('Add Section Error: ' + err.message, 'error');
+      showToast('Add Section Error: ' + err.message, 'error');
     }
   }
+
+  // Expose for inline onclick handlers
+  window._addSection = addSection;
 
   function selectSection(scriptId, sectionId) {
     if (state.activeScriptId === scriptId && state.activeSectionId === sectionId) return;
@@ -597,16 +603,30 @@
             const sections = s.sections || [];
             
             let sectionsHtml = '';
-            if (sections.length > 0) {
-              sectionsHtml = `<div class="script-sections-list">` +
-                sections.map(sec => `
-                  <div class="script-section-item ${sec.id === state.activeSectionId ? 'active' : ''}" data-script-id="${s.id}" data-section-id="${sec.id}">
-                    <span class="section-tree-line"></span>
-                    <span class="section-icon">#</span>
-                    <span class="section-name">${sec.name || 'Untitled'}</span>
-                  </div>
-                `).join('') +
-              `</div>`;
+            if (isScriptActive) {
+              // Show sections list + add button for the active script
+              if (sections.length > 0) {
+                sectionsHtml = `<div class="script-sections-list">` +
+                  sections.map(sec => `
+                    <div class="script-section-item ${sec.id === state.activeSectionId ? 'active' : ''}" data-script-id="${s.id}" data-section-id="${sec.id}">
+                      <span class="section-tree-line"></span>
+                      <span class="section-icon">#</span>
+                      <span class="section-name">${sec.name || 'Untitled'}</span>
+                    </div>
+                  `).join('') +
+                `</div>`;
+              }
+              // Always show the Add Section button for active script
+              sectionsHtml += `<button class="add-section-btn" data-script-id="${s.id}" onclick="window._addSection('${s.id}')" style="
+                display: flex; align-items: center; gap: 6px;
+                width: 100%; padding: 6px 12px 6px 32px;
+                margin-top: 2px;
+                background: transparent; border: 1px dashed var(--glass-border);
+                border-radius: var(--radius-sm);
+                color: var(--text-muted); font-size: 12px;
+                cursor: pointer; transition: all 0.2s ease;
+              " onmouseover="this.style.background='var(--glass-2)';this.style.borderColor='var(--accent)';this.style.color='var(--accent)'" onmouseout="this.style.background='transparent';this.style.borderColor='var(--glass-border)';this.style.color='var(--text-muted)'"
+              >+ Add Section</button>`;
             }
 
             return `
@@ -620,10 +640,7 @@
               }
             </div>
             <div class="script-item-info">
-              <div class="script-item-title-row" style="display:flex; justify-content:space-between; align-items:center;">
-                <div class="script-item-title">${s.title || 'Untitled Script'}</div>
-                ${isScriptActive ? `<button class="btn-icon add-section-btn" data-script-id="${s.id}" title="Add Section" style="padding:2px; font-size:14px; height:22px; width:22px; min-width:22px; line-height:1; display:flex; align-items:center; justify-content:center;">+</button>` : ''}
-              </div>
+              <div class="script-item-title">${s.title || 'Untitled Script'}</div>
               <div class="script-item-excerpt" style="font-size: 11px; color: var(--text-muted); margin: 2px 0 6px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
                 ${(() => {
                   const text = (s.content || '').replace(/<[^>]*>?/gm, ' ').replace(/\s+/g, ' ').trim();
