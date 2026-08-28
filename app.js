@@ -2144,26 +2144,49 @@
       const script = getActiveScript();
       if (!script) return;
 
-      $('#ppTitle').textContent = script.title || 'Untitled Script';
-      
-      // Combine main script and all sections
-      let content = script.content || '';
-      if (script.sections && script.sections.length > 0) {
-        script.sections.forEach(sec => {
-          content += `<br><br><h2 style="border-bottom: 1px solid #ccc; padding-bottom: 5px;">${sec.name || 'Untitled Section'}</h2><br>${sec.content || ''}`;
-        });
+      const printModeSelect = $('#ppPrintMode');
+      if (state.activeSectionId) {
+        printModeSelect.style.display = 'inline-block';
+        printModeSelect.value = 'section'; // default to section if they are inside one
+      } else {
+        printModeSelect.style.display = 'none';
+        printModeSelect.value = 'full';
+      }
+
+      updatePrintPreviewContent(script);
+      $('#printPreviewModal').hidden = false;
+    }
+
+    function updatePrintPreviewContent(script) {
+      const mode = $('#ppPrintMode').value;
+      let content = '';
+
+      if (mode === 'section' && state.activeSectionId) {
+        const sec = script.sections?.find(s => s.id === state.activeSectionId);
+        $('#ppTitle').textContent = sec ? sec.name : 'Untitled Section';
+        content = sec ? (sec.content || '') : '';
+      } else {
+        $('#ppTitle').textContent = script.title || 'Untitled Script';
+        content = script.content || '';
+        if (script.sections && script.sections.length > 0) {
+          script.sections.forEach(sec => {
+            content += `<br><br><h2 style="border-bottom: 1px solid #ccc; padding-bottom: 5px;">${sec.name || 'Untitled Section'}</h2><br>${sec.content || ''}`;
+          });
+        }
       }
 
       // Convert explicitly white text to black so it's visible on paper
       content = content.replace(/color:\s*(?:#ffffff|#fff|rgba?\(\s*255\s*,\s*255\s*,\s*255\s*(?:,\s*1\s*)?\))/gi, 'color: #000000');
       
       $('#ppBody').innerHTML = content;
-      
-      // Force font size in preview to match what they see, or set a standard print size
+      // Force font size in preview to match what they see
       $('#ppBody').style.fontSize = `${state.editorFontSize}px`;
-      
-      $('#printPreviewModal').hidden = false;
     }
+
+    $('#ppPrintMode').addEventListener('change', () => {
+      const script = getActiveScript();
+      if (script) updatePrintPreviewContent(script);
+    });
 
     // Print Preview UI Events
     $('.pp-close-btn').addEventListener('click', () => {
