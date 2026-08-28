@@ -468,32 +468,61 @@
     menu.hidden = false;
 
     // Handle clicks
-    menu.onclick = async (e) => {
+    menu.onclick = (e) => {
       const action = e.target.closest('.ctx-menu-item')?.dataset.action;
       if (!action) return;
+      e.stopPropagation(); // prevent the outside-click listener from interfering
 
       if (action === 'rename') {
-        menu.hidden = true; // hide menu before showing prompt
-        const newName = await showCustomPrompt('Enter new section name:', section.name);
-        if (newName && newName.trim()) {
-          section.name = newName.trim();
-          save();
-          renderSidebar();
+        menu.hidden = true;
+        // Use the working modal for rename
+        const overlay = document.getElementById('customPromptOverlay');
+        const titleEl = document.getElementById('customPromptTitle');
+        const inputEl = document.getElementById('customPromptInput');
+        const okBtn = document.getElementById('customPromptOk');
+        const cancelBtn = document.getElementById('customPromptCancel');
+
+        if (overlay && inputEl && titleEl && okBtn && cancelBtn) {
+          titleEl.textContent = 'Enter new section name:';
+          inputEl.value = section.name;
+          if (inputEl.parentElement) inputEl.parentElement.style.display = '';
+          overlay.hidden = false;
+          inputEl.focus();
+          inputEl.select();
+
+          const cleanup = () => {
+            overlay.hidden = true;
+            okBtn.onclick = null;
+            cancelBtn.onclick = null;
+            inputEl.onkeydown = null;
+          };
+          okBtn.onclick = () => {
+            const val = inputEl.value.trim();
+            cleanup();
+            if (val) {
+              section.name = val;
+              save();
+              renderSidebar();
+              showToast('Section renamed', 'success');
+            }
+          };
+          cancelBtn.onclick = () => { cleanup(); };
+          inputEl.onkeydown = (ev) => {
+            if (ev.key === 'Enter') { ev.preventDefault(); okBtn.onclick(); }
+            if (ev.key === 'Escape') { ev.preventDefault(); cancelBtn.onclick(); }
+          };
         }
       } else if (action === 'delete') {
         menu.hidden = true;
-        const confirmed = await showCustomConfirm(`Are you sure you want to delete section "${section.name}"?`);
-        if (confirmed) {
-          script.sections = script.sections.filter(s => s.id !== sectionId);
-          if (state.activeSectionId === sectionId) {
-            state.activeSectionId = null; // revert to main script
-            render();
-          }
-          save();
-          renderSidebar();
+        // Delete directly — no confirm needed for sections
+        script.sections = script.sections.filter(s => s.id !== sectionId);
+        if (state.activeSectionId === sectionId) {
+          state.activeSectionId = null;
         }
+        save();
+        render();
+        showToast('Section "' + section.name + '" deleted', 'success');
       }
-      if (!menu.hidden) menu.hidden = true;
     };
   }
 
