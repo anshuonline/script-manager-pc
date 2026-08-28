@@ -306,7 +306,7 @@
         const okBtn = $('#customPromptOk');
         const cancelBtn = $('#customPromptCancel');
 
-        if (!overlay || !inputEl) {
+        if (!overlay || !inputEl || !titleEl || !okBtn || !cancelBtn) {
           resolve(prompt(title, defaultValue)); // fallback
           return;
         }
@@ -350,7 +350,7 @@
         const okBtn = $('#customPromptOk');
         const cancelBtn = $('#customPromptCancel');
 
-        if (!overlay || !inputEl) {
+        if (!overlay || !inputEl || !titleEl || !okBtn || !cancelBtn) {
           resolve(confirm(title)); // fallback
           return;
         }
