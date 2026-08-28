@@ -299,99 +299,116 @@
 
   function showCustomPrompt(title, defaultValue = '') {
     return new Promise((resolve) => {
-      const overlay = $('#customPromptOverlay');
-      const titleEl = $('#customPromptTitle');
-      const inputEl = $('#customPromptInput');
-      const okBtn = $('#customPromptOk');
-      const cancelBtn = $('#customPromptCancel');
+      try {
+        const overlay = $('#customPromptOverlay');
+        const titleEl = $('#customPromptTitle');
+        const inputEl = $('#customPromptInput');
+        const okBtn = $('#customPromptOk');
+        const cancelBtn = $('#customPromptCancel');
 
-      if (!overlay || !inputEl) {
-        resolve(prompt(title, defaultValue)); // fallback
-        return;
+        if (!overlay || !inputEl) {
+          resolve(prompt(title, defaultValue)); // fallback
+          return;
+        }
+
+        titleEl.textContent = title;
+        inputEl.value = defaultValue;
+        overlay.hidden = false;
+        inputEl.focus();
+        inputEl.select();
+
+        const cleanup = () => {
+          overlay.hidden = true;
+          okBtn.removeEventListener('click', onOk);
+          cancelBtn.removeEventListener('click', onCancel);
+          inputEl.removeEventListener('keydown', onKey);
+        };
+
+        const onOk = () => { cleanup(); resolve(inputEl.value); };
+        const onCancel = () => { cleanup(); resolve(null); };
+        const onKey = (e) => {
+          if (e.key === 'Enter') { e.preventDefault(); onOk(); }
+          if (e.key === 'Escape') { e.preventDefault(); onCancel(); }
+        };
+
+        okBtn.addEventListener('click', onOk);
+        cancelBtn.addEventListener('click', onCancel);
+        inputEl.addEventListener('keydown', onKey);
+      } catch (err) {
+        if (typeof showToast === 'function') showToast('Prompt error: ' + err.message, 'error');
+        resolve(null);
       }
-
-      titleEl.textContent = title;
-      inputEl.value = defaultValue;
-      overlay.hidden = false;
-      inputEl.focus();
-      inputEl.select();
-
-      const cleanup = () => {
-        overlay.hidden = true;
-        okBtn.removeEventListener('click', onOk);
-        cancelBtn.removeEventListener('click', onCancel);
-        inputEl.removeEventListener('keydown', onKey);
-      };
-
-      const onOk = () => { cleanup(); resolve(inputEl.value); };
-      const onCancel = () => { cleanup(); resolve(null); };
-      const onKey = (e) => {
-        if (e.key === 'Enter') { e.preventDefault(); onOk(); }
-        if (e.key === 'Escape') { e.preventDefault(); onCancel(); }
-      };
-
-      okBtn.addEventListener('click', onOk);
-      cancelBtn.addEventListener('click', onCancel);
-      inputEl.addEventListener('keydown', onKey);
     });
   }
 
   function showCustomConfirm(title) {
     return new Promise((resolve) => {
-      const overlay = $('#customPromptOverlay');
-      const titleEl = $('#customPromptTitle');
-      const inputEl = $('#customPromptInput');
-      const okBtn = $('#customPromptOk');
-      const cancelBtn = $('#customPromptCancel');
+      try {
+        const overlay = $('#customPromptOverlay');
+        const titleEl = $('#customPromptTitle');
+        const inputEl = $('#customPromptInput');
+        const okBtn = $('#customPromptOk');
+        const cancelBtn = $('#customPromptCancel');
 
-      if (!overlay || !inputEl) {
-        resolve(confirm(title)); // fallback
-        return;
+        if (!overlay || !inputEl) {
+          resolve(confirm(title)); // fallback
+          return;
+        }
+
+        titleEl.textContent = title;
+        inputEl.parentElement.style.display = 'none'; // hide the input
+        overlay.hidden = false;
+
+        const cleanup = () => {
+          overlay.hidden = true;
+          inputEl.parentElement.style.display = ''; // restore input display
+          okBtn.removeEventListener('click', onOk);
+          cancelBtn.removeEventListener('click', onCancel);
+        };
+
+        const onOk = () => { cleanup(); resolve(true); };
+        const onCancel = () => { cleanup(); resolve(false); };
+
+        okBtn.addEventListener('click', onOk);
+        cancelBtn.addEventListener('click', onCancel);
+      } catch (err) {
+        if (typeof showToast === 'function') showToast('Confirm error: ' + err.message, 'error');
+        resolve(false);
       }
-
-      titleEl.textContent = title;
-      inputEl.parentElement.style.display = 'none'; // hide the input
-      overlay.hidden = false;
-
-      const cleanup = () => {
-        overlay.hidden = true;
-        inputEl.parentElement.style.display = ''; // restore input display
-        okBtn.removeEventListener('click', onOk);
-        cancelBtn.removeEventListener('click', onCancel);
-      };
-
-      const onOk = () => { cleanup(); resolve(true); };
-      const onCancel = () => { cleanup(); resolve(false); };
-
-      okBtn.addEventListener('click', onOk);
-      cancelBtn.addEventListener('click', onCancel);
     });
   }
 
   async function addSection(scriptId) {
-    const script = getScript(scriptId);
-    if (!script) return;
-    
-    if (!script.sections) script.sections = [];
-    const sectionName = await showCustomPrompt('Enter section name:', 'New Section');
-    if (!sectionName) return; // cancelled
+    try {
+      const script = getScript(scriptId);
+      if (!script) {
+        showToast('Script not found', 'error');
+        return;
+      }
+      
+      if (!script.sections) script.sections = [];
+      const sectionName = await showCustomPrompt('Enter section name:', 'New Section');
+      if (!sectionName) return; // cancelled
 
-    const newSection = {
-      id: generateId(),
-      name: sectionName.trim() || 'New Section',
-      content: ''
-    };
-    
-    script.sections.push(newSection);
-    
-    // Auto select the new section
-    saveCurrentEditorContent();
-    state.activeScriptId = scriptId;
-    state.activeSectionId = newSection.id;
-    state.currentView = 'editor';
-    
-    save();
-    render();
+      const newSection = {
+        id: generateId(),
+        name: sectionName.trim() || 'New Section',
+        content: ''
+      };
+      
+      script.sections.push(newSection);
+      
+      // Auto select the new section
+      saveCurrentEditorContent();
+      state.activeScriptId = scriptId;
+      state.activeSectionId = newSection.id;
+      state.currentView = 'editor';
+      
+      save();
+      render();
+    } catch (err) {
+      if (typeof showToast === 'function') showToast('Add Section Error: ' + err.message, 'error');
+    }
   }
 
   function selectSection(scriptId, sectionId) {
