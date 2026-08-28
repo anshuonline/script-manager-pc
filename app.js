@@ -2146,8 +2146,15 @@
 
       $('#ppTitle').textContent = script.title || 'Untitled Script';
       
-      // Convert explicitly white text to black so it's visible on paper
+      // Combine main script and all sections
       let content = script.content || '';
+      if (script.sections && script.sections.length > 0) {
+        script.sections.forEach(sec => {
+          content += `<br><br><h2 style="border-bottom: 1px solid #ccc; padding-bottom: 5px;">${sec.name || 'Untitled Section'}</h2><br>${sec.content || ''}`;
+        });
+      }
+
+      // Convert explicitly white text to black so it's visible on paper
       content = content.replace(/color:\s*(?:#ffffff|#fff|rgba?\(\s*255\s*,\s*255\s*,\s*255\s*(?:,\s*1\s*)?\))/gi, 'color: #000000');
       
       $('#ppBody').innerHTML = content;
