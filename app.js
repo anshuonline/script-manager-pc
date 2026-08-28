@@ -2864,7 +2864,7 @@
           break;
       }
     });
-
+  }
 
   // ── Comments Sidebar Logic ─────────────────────────────────
   function updateCommentsSidebar() {
