@@ -478,10 +478,86 @@ body {
 }
 
 .script-item-info {
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+}
+
+/* Sections Thread Styles */
+.script-item-wrapper {
+  margin-bottom: 8px;
+}
+
+.script-item-wrapper .script-item {
+  margin-bottom: 0;
+}
+
+.script-sections-list {
+  padding-left: 28px; /* indent */
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  margin-top: 4px;
+}
+
+/* The vertical thread line */
+.script-sections-list::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 16px;
+  left: 20px;
+  width: 2px;
+  background-color: var(--glass-border);
+  border-radius: 2px;
+}
+
+.script-section-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s var(--ease);
+  margin-bottom: 2px;
+}
+
+.script-section-item:hover {
+  background: var(--glass-1);
+  color: var(--text-primary);
+}
+
+.script-section-item.active {
+  background: var(--glass-2);
+  color: var(--accent);
+  font-weight: 500;
+}
+
+/* The horizontal curve line connecting to the section item */
+.script-section-item::before {
+  content: "";
+  position: absolute;
+  left: -8px;
+  top: 50%;
+  width: 12px;
+  height: 2px;
+  background-color: var(--glass-border);
+}
+
+.section-icon {
+  font-size: 14px;
+  opacity: 0.7;
+}
+
+.section-name {
+  white-space: nowrap;
   overflow: hidden;
+  text-overflow: ellipsis;
   flex: 1;
 }
 
@@ -1001,57 +1077,6 @@ body {
 .editor-content::-moz-selection {
   background-color: rgba(255, 213, 79, 0.4) !important;
   color: inherit !important;
-}
-
-/* Highlighted Script Part (Modern Bubble Design) */
-.editor-content .script-part {
-  position: relative;
-  display: block;
-  margin: 28px 0 16px 0; /* extra top margin for the badge */
-  padding: 16px 18px;
-  border-radius: 12px;
-  /* Removed border per user request */
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  transition: all 0.25s ease;
-}
-
-/* Floating Part Name Badge */
-.editor-content .script-part::before {
-  content: attr(data-part-name);
-  position: absolute;
-  top: -14px;
-  left: 16px;
-  padding: 4px 12px;
-  border-radius: 20px;
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: #fff;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-  z-index: 2;
-  transition: all 0.25s ease;
-}
-
-/* Rotating part colors */
-.editor-content .script-part[data-part-color="1"] { background-color: rgba(110, 106, 255, 0.08); /* border removed */ }
-.editor-content .script-part[data-part-color="1"]::before { background-color: #6e6aff; }
-
-.editor-content .script-part[data-part-color="2"] { background-color: rgba(255, 159, 67, 0.08); /* border removed */ }
-.editor-content .script-part[data-part-color="2"]::before { background-color: #ff9f43; color: #fff; }
-
-.editor-content .script-part[data-part-color="3"] { background-color: rgba(46, 213, 115, 0.08); /* border removed */ }
-.editor-content .script-part[data-part-color="3"]::before { background-color: #2ed573; color: #111; } /* Dark text for green badge */
-
-.editor-content .script-part[data-part-color="4"] { background-color: rgba(255, 107, 129, 0.08); /* border removed */ }
-.editor-content .script-part[data-part-color="4"]::before { background-color: #ff6b81; }
-
-.editor-content .script-part[data-part-color="5"] { background-color: rgba(30, 144, 255, 0.08); /* border removed */ }
-.editor-content .script-part[data-part-color="5"]::before { background-color: #1e90ff; }
-
-.editor-content .script-part.part-active {
-  outline: none;
-  /* Removed border and transform per user request */
 }
 
 /* Custom Context Menu */

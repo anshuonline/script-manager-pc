@@ -281,9 +281,10 @@
   }
 
   function selectScript(id) {
-    if (state.activeScriptId === id) return;
+    if (state.activeScriptId === id && !state.activeSectionId) return;
     saveCurrentEditorContent();
     state.activeScriptId = id;
+    state.activeSectionId = null; // Reset section when selecting main script
     state.currentView = 'editor';
     render();
     save();
@@ -294,6 +295,109 @@
       const sidebar = $('#listPane');
       if (sidebar) sidebar.classList.remove('sidebar-open');
     }
+  }
+
+  function addSection(scriptId) {
+    const script = getScript(scriptId);
+    if (!script) return;
+    
+    if (!script.sections) script.sections = [];
+    const sectionName = prompt('Enter section name:', 'New Section');
+    if (!sectionName) return; // cancelled
+
+    const newSection = {
+      id: generateId(),
+      name: sectionName.trim() || 'New Section',
+      content: ''
+    };
+    
+    script.sections.push(newSection);
+    
+    // Auto select the new section
+    saveCurrentEditorContent();
+    state.activeScriptId = scriptId;
+    state.activeSectionId = newSection.id;
+    state.currentView = 'editor';
+    
+    save();
+    render();
+  }
+
+  function selectSection(scriptId, sectionId) {
+    if (state.activeScriptId === scriptId && state.activeSectionId === sectionId) return;
+    
+    saveCurrentEditorContent();
+    state.activeScriptId = scriptId;
+    state.activeSectionId = sectionId;
+    state.currentView = 'editor';
+    render();
+    save();
+
+    // Close mobile sidebar if open
+    if (document.body.classList.contains('sidebar-is-open')) {
+      document.body.classList.remove('sidebar-is-open');
+      const sidebar = $('#listPane');
+      if (sidebar) sidebar.classList.remove('sidebar-open');
+    }
+  }
+
+  function showSectionContextMenu(x, y, scriptId, sectionId) {
+    const script = getScript(scriptId);
+    if (!script) return;
+    const section = script.sections?.find(s => s.id === sectionId);
+    if (!section) return;
+
+    // Create a temporary context menu element
+    let menu = document.getElementById('sectionContextMenu');
+    if (!menu) {
+      menu = document.createElement('div');
+      menu.id = 'sectionContextMenu';
+      menu.className = 'editor-context-menu';
+      document.body.appendChild(menu);
+      
+      // Close on click outside
+      document.addEventListener('click', (e) => {
+        if (!e.target.closest('#sectionContextMenu')) {
+          menu.hidden = true;
+        }
+      });
+    }
+
+    menu.innerHTML = `
+      <button class="ctx-menu-item" data-action="rename">✏️&nbsp;&nbsp;Rename Section</button>
+      <div class="ctx-menu-divider"></div>
+      <button class="ctx-menu-item ctx-danger" data-action="delete" style="color: #ff6b81;">🗑️&nbsp;&nbsp;Delete Section</button>
+    `;
+
+    menu.style.left = `${x}px`;
+    menu.style.top = `${y}px`;
+    menu.hidden = false;
+
+    // Handle clicks
+    menu.onclick = (e) => {
+      const action = e.target.closest('.ctx-menu-item')?.dataset.action;
+      if (!action) return;
+
+      if (action === 'rename') {
+        const newName = prompt('Enter new section name:', section.name);
+        if (newName && newName.trim()) {
+          section.name = newName.trim();
+          save();
+          renderSidebar();
+        }
+      } else if (action === 'delete') {
+        if (confirm(`Are you sure you want to delete section "${section.name}"?`)) {
+          script.sections = script.sections.filter(s => s.id !== sectionId);
+          if (state.activeSectionId === sectionId) {
+            state.activeSectionId = null; // revert to main script
+            loadEditorContent();
+          }
+          save();
+          renderSidebar();
+        }
+      }
+      menu.hidden = true;
+    };
   }
 
   async function translateToEnglish(text) {
@@ -319,8 +423,17 @@
     let titleChanged = false;
 
     if (editor) {
-      script.content = editor.innerHTML;
+      if (state.activeSectionId) {
+        if (!script.sections) script.sections = [];
+        const section = script.sections.find(s => s.id === state.activeSectionId);
+        if (section) {
+          section.content = editor.innerHTML;
+        }
+      } else {
+        script.content = editor.innerHTML;
+      }
     }
+    
     if (titleInput) {
       if (script.title !== titleInput.value) {
         titleChanged = true;
@@ -388,32 +501,55 @@
       
       let html = visible
         .map(
-          (s, i) => `
-        <div class="script-item ${s.id === state.activeScriptId ? 'active' : ''}" 
-             data-id="${s.id}" style="animation-delay: ${i * 40}ms">
-          <div class="script-item-thumb">
-            ${
-              s.coverImage
-                ? `<img src="${s.coverImage}" alt="">`
-                : '<span>📄</span>'
+          (s, i) => {
+            const isScriptActive = s.id === state.activeScriptId;
+            const sections = s.sections || [];
+            
+            let sectionsHtml = '';
+            if (sections.length > 0) {
+              sectionsHtml = `<div class="script-sections-list">` +
+                sections.map(sec => `
+                  <div class="script-section-item ${sec.id === state.activeSectionId ? 'active' : ''}" data-script-id="${s.id}" data-section-id="${sec.id}">
+                    <span class="section-tree-line"></span>
+                    <span class="section-icon">#</span>
+                    <span class="section-name">${sec.name || 'Untitled'}</span>
+                  </div>
+                `).join('') +
+              `</div>`;
             }
-          </div>
-          <div class="script-item-info">
-            <div class="script-item-title">${s.title || 'Untitled Script'}</div>
-            <div class="script-item-excerpt" style="font-size: 11px; color: var(--text-muted); margin: 2px 0 6px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-              ${(() => {
-                const text = (s.content || '').replace(/<[^>]*>?/gm, ' ').replace(/\s+/g, ' ').trim();
-                return text ? text : 'No content...';
-              })()}
+
+            return `
+        <div class="script-item-wrapper" style="animation-delay: ${i * 40}ms">
+          <div class="script-item ${isScriptActive && !state.activeSectionId ? 'active' : ''}" data-id="${s.id}">
+            <div class="script-item-thumb">
+              ${
+                s.coverImage
+                  ? `<img src="${s.coverImage}" alt="">`
+                  : '<span>📄</span>'
+              }
             </div>
-            <div class="script-item-meta">
-              <span class="script-item-status status-${s.status || 'pending'}">${(s.status || 'pending').toUpperCase()}</span>
-              <span class="script-item-date ${s.publishDate ? 'has-date' : ''}">
-                ${s.publishDate ? '📅 ' + formatShortDate(s.publishDate) : 'No date'}
-              </span>
+            <div class="script-item-info">
+              <div class="script-item-title-row" style="display:flex; justify-content:space-between; align-items:center;">
+                <div class="script-item-title">${s.title || 'Untitled Script'}</div>
+                ${isScriptActive ? `<button class="btn-icon add-section-btn" data-script-id="${s.id}" title="Add Section" style="padding:2px; font-size:14px; height:22px; width:22px; min-width:22px; line-height:1; display:flex; align-items:center; justify-content:center;">+</button>` : ''}
+              </div>
+              <div class="script-item-excerpt" style="font-size: 11px; color: var(--text-muted); margin: 2px 0 6px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                ${(() => {
+                  const text = (s.content || '').replace(/<[^>]*>?/gm, ' ').replace(/\s+/g, ' ').trim();
+                  return text ? text : 'No content...';
+                })()}
+              </div>
+              <div class="script-item-meta">
+                <span class="script-item-status status-${s.status || 'pending'}">${(s.status || 'pending').toUpperCase()}</span>
+                <span class="script-item-date ${s.publishDate ? 'has-date' : ''}">
+                  ${s.publishDate ? '📅 ' + formatShortDate(s.publishDate) : 'No date'}
+                </span>
+              </div>
             </div>
           </div>
-        </div>`
+          ${sectionsHtml}
+        </div>`;
+          }
         )
         .join('');
         
@@ -522,17 +658,58 @@
     const publishDateBtn = $('#publishDateBtn');
     const statusSelect = $('#scriptStatus');
 
-    if (titleInput) titleInput.value = script.title || '';
+    const isSection = !!state.activeSectionId;
+    let section = null;
+    if (isSection) {
+      section = script.sections?.find(s => s.id === state.activeSectionId);
+    }
+
+    if (titleInput) {
+      if (isSection && section) {
+        titleInput.value = section.name || '';
+        titleInput.readOnly = true; // disable renaming from here, use ctx menu
+      } else {
+        titleInput.value = script.title || '';
+        titleInput.readOnly = false;
+      }
+    }
+    
     if (statusSelect) statusSelect.value = script.status || 'pending';
 
+    // Toolbar visibility
+    const editorToolbar = $('.editor-toolbar');
+    const toolsSidebar = $('#toolsSidebar');
+    if (editorToolbar) editorToolbar.style.display = isSection ? 'none' : 'flex';
+    if (toolsSidebar) toolsSidebar.style.display = isSection ? 'none' : 'block';
+
     if (editor) {
-      editor.innerHTML = script.content || '';
+      if (isSection && section) {
+        editor.innerHTML = section.content || '';
+      } else {
+        editor.innerHTML = script.content || '';
+      }
+      
       editor.style.fontSize = `${state.editorFontSize}px`;
       editor.style.lineHeight = state.editorLineHeight || '1.6';
       if (state.editorLineHeight === '2.5') {
         $('#lineSpacingBtn')?.classList.add('active');
       }
-      updatePartsSidebar();
+
+      // Legacy part migration: unwrap any old .script-part elements
+      const legacyParts = editor.querySelectorAll('.script-part');
+      if (legacyParts.length > 0) {
+        legacyParts.forEach(part => {
+          const fragment = document.createDocumentFragment();
+          while (part.firstChild) {
+            fragment.appendChild(part.firstChild);
+          }
+          part.parentNode.replaceChild(fragment, part);
+        });
+        editor.normalize();
+        // Fire save later to persist migration
+        setTimeout(() => { if (typeof saveCurrentEditorContent === 'function') saveCurrentEditorContent(); }, 500);
+      }
+
       updateCommentsSidebar();
       if (typeof updateEditorStats === 'function') {
         updateEditorStats();
@@ -910,7 +1087,7 @@
   }
 
   // ── Teleprompter ───────────────────────────────────────────
-  let tpScriptParts = [];
+  let tpScriptSections = [];
 
   function openTeleprompter() {
     saveCurrentEditorContent();
@@ -920,8 +1097,8 @@
     const tpOverlay = $('#teleprompterOverlay');
     const tpContent = $('#tpContent');
     const tpScrollArea = $('#tpScrollArea');
-    const tpPartGroup = $('#tpPartGroup');
-    const tpPartSelect = $('#tpPartSelect');
+    const tpSectionGroup = $('#tpSectionGroup');
+    const tpSectionSelect = $('#tpSectionSelect');
 
     // Stop any existing animation
     state.tpIsPlaying = false;
@@ -929,24 +1106,20 @@
     tpAnimationId = null;
     tpLastTimestamp = null;
 
-    // Extract parts directly from the editor DOM
-    const editorEl = $('#editor');
-    let partElements = editorEl ? Array.from(editorEl.querySelectorAll('.script-part')) : [];
+    tpScriptSections = [];
+    let tpSectionNames = [];
     
-    tpScriptParts = [];
-    let tpScriptNames = [];
-    
-    if (partElements.length > 0) {
-      if (script.partsOrder) {
-        partElements.sort((a, b) => script.partsOrder.indexOf(a.id) - script.partsOrder.indexOf(b.id));
-      }
-      partElements.forEach(el => {
-        tpScriptParts.push(el.innerHTML);
-        tpScriptNames.push(el.dataset.partName || 'Part');
+    if (script.sections && script.sections.length > 0) {
+      tpScriptSections.push(script.content || '<h2 style="text-align:center; color:#666;">Empty Script</h2>');
+      tpSectionNames.push('Main Script');
+      
+      script.sections.forEach(sec => {
+        tpScriptSections.push(sec.content || '<h2 style="text-align:center; color:#666;">Empty Section</h2>');
+        tpSectionNames.push(sec.name || 'Section');
       });
     } else {
-      tpScriptParts = [script.content || '<h2 style="text-align:center; color:#666;">Empty Script</h2>'];
-      tpScriptNames = ['Script'];
+      tpScriptSections = [script.content || '<h2 style="text-align:center; color:#666;">Empty Script</h2>'];
+      tpSectionNames = ['Script'];
     }
 
     function sanitizeTpHtml(html) {
@@ -958,9 +1131,9 @@
       temp.querySelectorAll('*').forEach(el => {
         el.removeAttribute('style');
         el.removeAttribute('class');
-        // Remove data attributes except data-part-name
+        // Remove data attributes except those we might want to keep
         Array.from(el.attributes).forEach(attr => {
-          if (attr.name.startsWith('data-') && attr.name !== 'data-part-name') {
+          if (attr.name.startsWith('data-')) {
             el.removeAttribute(attr.name);
           }
         });
@@ -974,16 +1147,23 @@
       return html.replace(/\[([A-Z][A-Z0-9 _\-]*)\]/g, '<span class="tp-marker">[$1]</span>');
     }
 
-    if (tpScriptParts.length > 1) {
-      if (tpPartGroup) tpPartGroup.style.display = 'block';
-      if (tpPartSelect) {
-        tpPartSelect.innerHTML = tpScriptNames.map((name, i) => `<option value="${i}">${name}</option>`).join('');
-        tpPartSelect.value = "0";
+    if (tpScriptSections.length > 1) {
+      if (tpSectionGroup) tpSectionGroup.style.display = 'block';
+      if (tpSectionSelect) {
+        tpSectionSelect.innerHTML = tpSectionNames.map((name, i) => `<option value="${i}">${name}</option>`).join('');
+        
+        // Match active section
+        let activeIdx = 0;
+        if (state.activeSectionId) {
+          const sIdx = script.sections.findIndex(s => s.id === state.activeSectionId);
+          if (sIdx !== -1) activeIdx = sIdx + 1;
+        }
+        tpSectionSelect.value = activeIdx.toString();
+        tpContent.innerHTML = highlightMarkers(sanitizeTpHtml(tpScriptSections[activeIdx]));
       }
-      tpContent.innerHTML = highlightMarkers(sanitizeTpHtml(tpScriptParts[0]));
     } else {
-      if (tpPartGroup) tpPartGroup.style.display = 'none';
-      tpContent.innerHTML = highlightMarkers(sanitizeTpHtml(tpScriptParts[0]));
+      if (tpSectionGroup) tpSectionGroup.style.display = 'none';
+      tpContent.innerHTML = highlightMarkers(sanitizeTpHtml(tpScriptSections[0]));
     }
     
     // Initialize Toggle State
@@ -1681,43 +1861,6 @@
   // ── Event Listeners ────────────────────────────────────────
   function setupEventListeners() {
     setupFindReplaceListeners();
-    // Parts List Drag & Drop Reordering
-    const partsList = $('#partsList');
-    if (partsList) {
-      partsList.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        const draggable = document.querySelector('.part-item.dragging');
-        if (!draggable) return;
-        
-        const draggableElements = [...partsList.querySelectorAll('.part-item:not(.dragging)')];
-        const afterElement = draggableElements.reduce((closest, child) => {
-          const box = child.getBoundingClientRect();
-          const offset = e.clientY - box.top - box.height / 2;
-          if (offset < 0 && offset > closest.offset) {
-            return { offset: offset, element: child };
-          } else {
-            return closest;
-          }
-        }, { offset: Number.NEGATIVE_INFINITY }).element;
-        
-        if (afterElement == null) {
-          partsList.appendChild(draggable);
-        } else {
-          partsList.insertBefore(draggable, afterElement);
-        }
-      });
-
-      partsList.addEventListener('drop', (e) => {
-        e.preventDefault();
-        const script = getActiveScript();
-        if (!script) return;
-        
-        const newOrder = Array.from(partsList.querySelectorAll('.part-item')).map(item => item.dataset.partId);
-        script.partsOrder = newOrder;
-        save();
-        updatePartsSidebar();
-      });
-    }
 
     // New script buttons
     $('#newScriptBtn').addEventListener('click', createScript);
@@ -1752,9 +1895,34 @@
         renderSidebar();
         return;
       }
+
+      const addSectionBtn = e.target.closest('.add-section-btn');
+      if (addSectionBtn) {
+        e.stopPropagation();
+        const scriptId = addSectionBtn.dataset.scriptId;
+        addSection(scriptId);
+        return;
+      }
+
+      const sectionItem = e.target.closest('.script-section-item');
+      if (sectionItem) {
+        e.stopPropagation();
+        selectSection(sectionItem.dataset.scriptId, sectionItem.dataset.sectionId);
+        return;
+      }
       
       const item = e.target.closest('.script-item');
       if (item) selectScript(item.dataset.id);
+    });
+
+    $('#scriptList').addEventListener('contextmenu', (e) => {
+      const sectionItem = e.target.closest('.script-section-item');
+      if (sectionItem) {
+        e.preventDefault();
+        const scriptId = sectionItem.dataset.scriptId;
+        const sectionId = sectionItem.dataset.sectionId;
+        showSectionContextMenu(e.clientX, e.clientY, scriptId, sectionId);
+      }
     });
 
     // Nav tabs
@@ -1944,11 +2112,11 @@
     $('#tpBackBtn').addEventListener('click', closeTeleprompter);
     $('#tpPlayPauseBtn').addEventListener('click', toggleTeleprompterPlay);
 
-    const tpPartSelect = $('#tpPartSelect');
-    if (tpPartSelect) {
-      tpPartSelect.addEventListener('change', (e) => {
-        const partIndex = parseInt(e.target.value, 10);
-        const raw = tpScriptParts[partIndex] || '';
+    const tpSectionSelect = $('#tpSectionSelect');
+    if (tpSectionSelect) {
+      tpSectionSelect.addEventListener('change', (e) => {
+        const secIndex = parseInt(e.target.value, 10);
+        const raw = tpScriptSections[secIndex] || '';
         // Sanitize: strip styles/classes
         const temp = document.createElement('div');
         temp.innerHTML = raw;
@@ -2247,7 +2415,7 @@
         if (typeof saveCurrentEditorContent === 'function') saveCurrentEditorContent();
       },
       updateParts: function() {
-        if (typeof updatePartsSidebar === 'function') updatePartsSidebar();
+
       },
       toast: function(msg, type) {
         if (typeof showToast === 'function') showToast(msg, type || 'info');
@@ -2698,107 +2866,6 @@
     });
 
 
-    window.activePartItemContextMenu = null;
-
-    $('#partContextMenu')?.addEventListener('click', (e) => {
-      if (!window.activePartItemContextMenu) return;
-      const action = e.target.closest('.ctx-menu-item')?.dataset.action;
-      if (!action) return;
-      
-      const partId = window.activePartItemContextMenu.dataset.partId;
-      const partEl = document.getElementById(partId);
-      
-      if (!partEl) {
-        $('#partContextMenu').hidden = true;
-        return;
-      }
-
-      if (action === 'edit-part-name') {
-        const currentName = partEl.dataset.partName || 'Part';
-        const newName = prompt('Enter new part name:', currentName);
-        if (newName && newName.trim() !== '') {
-          partEl.dataset.partName = newName.trim();
-          updatePartsSidebar();
-          saveCurrentEditorContent();
-        }
-      } else if (action === 'delete-part') {
-        // Unwrap part: move all children out, normalize DOM
-        const parent = partEl.parentNode;
-        const children = Array.from(partEl.childNodes);
-        
-        children.forEach(child => {
-          if (child.nodeType === 3) {
-            // Bare text node → wrap in <p>
-            if (child.textContent.trim() !== '') {
-              const p = document.createElement('p');
-              p.textContent = child.textContent;
-              parent.insertBefore(p, partEl);
-            }
-          } else if (child.nodeType === 1) {
-            // Convert headings to paragraphs to prevent font-size issues
-            const headingTags = ['H1', 'H2', 'H3', 'H4', 'H5', 'H6'];
-            if (headingTags.includes(child.tagName)) {
-              const p = document.createElement('p');
-              p.innerHTML = child.innerHTML;
-              parent.insertBefore(p, partEl);
-            } else if (child.tagName === 'DIV' && !child.classList.length) {
-              // Plain divs → convert to <p>
-              const p = document.createElement('p');
-              p.innerHTML = child.innerHTML;
-              parent.insertBefore(p, partEl);
-            } else {
-              parent.insertBefore(child, partEl);
-            }
-            
-            // Strip ALL inline font styles from this element and its children
-            const toClean = child.parentNode ? [child, ...child.querySelectorAll('[style]')] : [];
-            toClean.forEach(el => {
-              if (el.style) {
-                el.style.fontSize = '';
-                el.style.fontFamily = '';
-                el.style.lineHeight = '';
-                el.style.fontWeight = '';
-                if (!el.getAttribute('style')?.trim()) {
-                  el.removeAttribute('style');
-                }
-              }
-            });
-          }
-        });
-        
-        parent.removeChild(partEl);
-        
-        // Clean up: normalize editor to merge adjacent text nodes
-        const editorEl = document.getElementById('editor');
-        if (editorEl) editorEl.normalize();
-        
-        updatePartsSidebar();
-        saveCurrentEditorContent();
-      } else if (action === 'change-color') {
-        let colorIndex = parseInt(partEl.dataset.partColor);
-        colorIndex = (colorIndex % 5) + 1; // cycle 1-5
-        partEl.dataset.partColor = String(colorIndex);
-        updatePartsSidebar();
-        saveCurrentEditorContent();
-      } else if (action === 'print-part') {
-        let content = partEl.innerHTML || '';
-        content = content.replace(/color:\s*(?:#ffffff|#fff|rgba?\(\s*255\s*,\s*255\s*,\s*255\s*(?:,\s*1\s*)?\))/gi, 'color: #000000');
-        $('#ppTitle').textContent = partEl.dataset.partName || 'Part';
-        $('#ppBody').innerHTML = content;
-        $('#printPreviewModal').hidden = false;
-      }
-      
-      $('#partContextMenu').hidden = true;
-    });
-
-    document.addEventListener('click', (e) => {
-      if (!e.target.closest('#partContextMenu')) {
-        const pcm = $('#partContextMenu');
-        if (pcm) pcm.hidden = true;
-      }
-    });
-  }
-
   // ── Comments Sidebar Logic ─────────────────────────────────
   function updateCommentsSidebar() {
     const commentsList = $('#commentsList');
@@ -2918,130 +2985,7 @@
   window._smBridge.updateCommentsSidebar = updateCommentsSidebar;
 
   // ── Parts Sidebar Logic ────────────────────────────────────
-  const PART_SIDEBAR_COLORS = ['#6e6aff', '#ff9f43', '#2ed573', '#ff6b81', '#1e90ff'];
 
-  function updatePartsSidebar() {
-    const partsList = $('#partsList');
-    if (!partsList) return;
-    partsList.innerHTML = '';
-    
-    const editorEl = $('#editor');
-    if (!editorEl) return;
-    
-    const script = getActiveScript();
-    if (!script) return;
-
-    let domParts = Array.from(editorEl.querySelectorAll('.script-part'));
-    if (domParts.length === 0) return;
-
-    // Ensure IDs and default names/colors exist
-    if (!script.partsOrder) script.partsOrder = [];
-    const domIds = domParts.map((p, index) => {
-      if (!p.id) p.id = 'part-' + Math.random().toString(36).substr(2, 9);
-      if (!p.dataset.partColor) p.dataset.partColor = String((index % 5) + 1);
-      if (!p.dataset.partName) p.dataset.partName = 'Part ' + (index + 1);
-      return p.id;
-    });
-
-    // Cleanup and add new parts to order
-    script.partsOrder = script.partsOrder.filter(id => domIds.includes(id));
-    domIds.forEach(id => {
-      if (!script.partsOrder.includes(id)) script.partsOrder.push(id);
-    });
-
-    // Sort by custom order
-    let sortedParts = [...domParts].sort((a, b) => script.partsOrder.indexOf(a.id) - script.partsOrder.indexOf(b.id));
-
-    sortedParts.forEach((part) => {
-      const colorIndex = parseInt(part.dataset.partColor) - 1;
-      const color = PART_SIDEBAR_COLORS[colorIndex] || PART_SIDEBAR_COLORS[0];
-      
-      const item = document.createElement('div');
-      item.className = 'part-item';
-      item.dataset.partId = part.id;
-      item.draggable = true;
-
-      item.addEventListener('dragstart', (e) => {
-        item.classList.add('dragging');
-        e.dataTransfer.effectAllowed = 'move';
-        // Need to set data for Firefox
-        e.dataTransfer.setData('text/plain', part.id);
-      });
-      item.addEventListener('dragend', () => {
-        item.classList.remove('dragging');
-        
-        // Ensure new order is saved properly when drag completes
-        const script = getActiveScript();
-        if (script && partsList) {
-          const newOrder = Array.from(partsList.querySelectorAll('.part-item')).map(el => el.dataset.partId);
-          script.partsOrder = newOrder;
-          save();
-          updatePartsSidebar(); // refresh to enforce the correct order array
-        }
-      });
-      
-      item.addEventListener('contextmenu', (e) => {
-        e.preventDefault();
-        window.activePartItemContextMenu = item;
-        const ctxMenu = $('#partContextMenu');
-        if (ctxMenu) {
-          ctxMenu.style.left = `${e.clientX}px`;
-          ctxMenu.style.top = `${e.clientY}px`;
-          ctxMenu.hidden = false;
-        }
-      });
-      
-      const leftDiv = document.createElement('div');
-      leftDiv.className = 'part-item-left';
-
-      const colorDot = document.createElement('span');
-      colorDot.className = 'part-item-color';
-      colorDot.style.backgroundColor = color;
-
-      const name = document.createElement('span');
-      name.className = 'part-item-name';
-      name.textContent = part.dataset.partName;
-      
-      const delBtn = document.createElement('button');
-      delBtn.className = 'btn-delete-part';
-      delBtn.innerHTML = '🗑️';
-      delBtn.title = 'Remove Part (Keeps Text)';
-      
-      // Click on part item → scroll to it and highlight it in editor
-      item.addEventListener('click', (e) => {
-        if (e.target === delBtn || delBtn.contains(e.target)) return;
-
-        // Remove previous active state
-        $$('#editor .script-part.part-active').forEach(el => el.classList.remove('part-active'));
-        
-        part.classList.add('part-active');
-        part.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        
-        // Remove active after 2 seconds
-        setTimeout(() => {
-          part.classList.remove('part-active');
-        }, 2000);
-      });
-      
-      delBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        // Unwrap the part without deleting text
-        const fragment = document.createDocumentFragment();
-        while (part.firstChild) {
-          fragment.appendChild(part.firstChild);
-        }
-        part.parentNode.replaceChild(fragment, part);
-        updatePartsSidebar();
-        saveCurrentEditorContent();
-      });
-      
-      leftDiv.appendChild(colorDot);
-      leftDiv.appendChild(name);
-      item.appendChild(leftDiv);
-      item.appendChild(delBtn);
-      partsList.appendChild(item);
-    });
-  }
 
   // ── MUI Ripple Effect Logic ──────────────────────────────────
   function createRipple(event) {
@@ -3242,7 +3186,7 @@
         }
         
         saveCurrentEditorContent();
-        updatePartsSidebar();
+
       } else {
         removeDropIndicator();
         document.getElementById('insertImageInput').click();

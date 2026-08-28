@@ -309,10 +309,14 @@
   // 5. Menu show / hide
   // ---------------------------------------------------------------------------
 
+
+  // ---------------------------------------------------------------------------
+  // 5. Menu show / hide
+  // ---------------------------------------------------------------------------
+
   function showMenu(x, y, insideTable) {
     // Build menu items
     const items = [
-      { label: 'Make Part',          action: 'makePart' },
       { label: 'Highlight',          action: 'highlight' },
       { label: 'Remove Highlight',   action: 'removeHighlight' },
       { label: '💬 Add Comment',     action: 'addComment' },
@@ -363,7 +367,7 @@
   }
 
   // ---------------------------------------------------------------------------
-  // 6. Part Prompt Modal
+  // 6. Context Menu Actions
   // ---------------------------------------------------------------------------
 
   let savedRange = null; // the selection range at the moment the user right-clicked
@@ -371,38 +375,6 @@
   // To prevent the context menu from stealing selection on click:
   menu.addEventListener('mousedown', (e) => {
     e.preventDefault(); // Prevents selection from moving to the menu
-  });
-
-  function showPartPrompt(defaultName) {
-    partInput.value = defaultName;
-    overlay.classList.add('ctx-modal-visible');
-    // Defer focus so the animation has started
-    requestAnimationFrame(() => {
-      partInput.focus();
-      partInput.select();
-    });
-  }
-
-  function hidePartPrompt() {
-    overlay.classList.remove('ctx-modal-visible');
-  }
-
-  function confirmPart() {
-    const name = partInput.value.trim() || ('Part ' + partCounter);
-    hidePartPrompt();
-    wrapSelectionAsPart(name);
-  }
-
-  partBtnOk.addEventListener('click', confirmPart);
-  partBtnCancel.addEventListener('click', hidePartPrompt);
-
-  partInput.addEventListener('keydown', function (e) {
-    if (e.key === 'Enter') { e.preventDefault(); confirmPart(); }
-    if (e.key === 'Escape') { e.preventDefault(); hidePartPrompt(); }
-  });
-
-  overlay.addEventListener('mousedown', function (e) {
-    if (e.target === overlay) hidePartPrompt();
   });
 
   // ---------------------------------------------------------------------------

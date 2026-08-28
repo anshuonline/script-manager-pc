@@ -279,7 +279,6 @@
           <!-- Tab Navigation -->
           <div class="tools-tabs">
             <button class="tools-tab-btn active" data-tab="insert">Insert</button>
-            <button class="tools-tab-btn" data-tab="parts">Parts</button>
             <button class="tools-tab-btn" data-tab="characters" id="openCharactersViewBtn">Characters</button>
             <button class="tools-tab-btn" data-tab="comments">Comments</button>
           </div>
@@ -341,19 +340,6 @@
                 </button>
               </div>
               <input type="file" id="insertImageInput" accept="image/*" hidden>
-            </div>
-
-            <!-- Parts Tab (Original functionality) -->
-            <div id="tab-parts" class="tools-panel">
-              <div class="parts-sidebar-header">
-                <h3>📑 Script Parts</h3>
-              </div>
-              <div class="parts-sidebar-body">
-                <p class="parts-hint">Select text in editor → Right click → <b>Make Part</b></p>
-                <div id="partsList" class="parts-list">
-                  <!-- Part items will be injected here -->
-                </div>
-              </div>
             </div>
 
             <!-- Characters Tab -->
@@ -711,8 +697,8 @@
         
         <div class="tphud-divider"></div>
         
-        <div id="tpPartGroup" class="tphud-part-group" style="display:none;">
-          <select id="tpPartSelect" class="status-select" style="min-width: 90px; border:none; background:transparent; padding:0; box-shadow:none; padding-right: 20px;"></select>
+        <div id="tpSectionGroup" class="tphud-section-group" style="display:none;">
+          <select id="tpSectionSelect" class="status-select" style="min-width: 90px; border:none; background:transparent; padding:0; box-shadow:none; padding-right: 20px;"></select>
         </div>
         
         <div class="tphud-divider"></div>
@@ -1002,14 +988,7 @@
 
   <!-- Context menu is now created dynamically by context-menu.js -->
 
-  <!-- Part Context Menu -->
-  <div id="partContextMenu" class="editor-context-menu" hidden>
-    <button class="ctx-menu-item" data-action="edit-part-name">✏️&nbsp;&nbsp;Edit Name</button>
-    <button class="ctx-menu-item" data-action="print-part">🖨️&nbsp;&nbsp;Print Part</button>
-    <button class="ctx-menu-item" data-action="change-color">🎨&nbsp;&nbsp;Change Color</button>
-    <div class="ctx-menu-divider"></div>
-    <button class="ctx-menu-item" data-action="delete-part" style="color: #ff6b81;">🗑️&nbsp;&nbsp;Delete Part</button>
-  </div>
+
 
   <!-- Text Context Menu (for selection) -->
   <div id="textContextMenu" class="editor-context-menu" hidden>
