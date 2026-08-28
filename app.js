@@ -561,10 +561,22 @@
     }
     
     if (titleInput) {
-      if (script.title !== titleInput.value) {
-        titleChanged = true;
+      if (state.activeSectionId) {
+        const section = script.sections?.find(s => s.id === state.activeSectionId);
+        if (section) {
+          section.name = titleInput.value;
+          // Trigger sidebar update since name changed
+          const sidebarItem = document.querySelector(`.script-section-item[data-section-id="${section.id}"] .section-name`);
+          if (sidebarItem && sidebarItem.textContent !== section.name) {
+             sidebarItem.textContent = section.name || 'Untitled';
+          }
+        }
+      } else {
+        if (script.title !== titleInput.value) {
+          titleChanged = true;
+        }
+        script.title = titleInput.value;
       }
-      script.title = titleInput.value;
     }
     script.updatedAt = new Date().toISOString();
     save();
@@ -804,10 +816,12 @@
     if (titleInput) {
       if (isSection && section) {
         titleInput.value = section.name || '';
-        titleInput.readOnly = true; // disable renaming from here, use ctx menu
+        titleInput.readOnly = false;
+        titleInput.placeholder = 'Section Name';
       } else {
         titleInput.value = script.title || '';
         titleInput.readOnly = false;
+        titleInput.placeholder = 'Untitled Script';
       }
     }
     
