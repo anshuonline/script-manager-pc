@@ -2004,11 +2004,9 @@
         return;
       }
 
-      const addSectionBtn = e.target.closest('.add-section-btn');
-      if (addSectionBtn) {
+      // add-section-btn handled by inline onclick, skip here
+      if (e.target.closest('.add-section-btn')) {
         e.stopPropagation();
-        const scriptId = addSectionBtn.dataset.scriptId;
-        addSection(scriptId);
         return;
       }
 
@@ -2048,6 +2046,18 @@
         if (state.activeScriptId) {
           const script = getActiveScript();
           const modalText = $('#deleteModalText');
+          
+          // If a section is active, delete the section, not the script
+          if (state.activeSectionId && script && script.sections) {
+            const section = script.sections.find(s => s.id === state.activeSectionId);
+            const sectionName = section ? section.name : 'this section';
+            if (modalText) {
+              modalText.textContent = `Are you sure you want to delete section "${sectionName}"?`;
+            }
+            openModal('deleteModal');
+            return;
+          }
+          
           if (script && modalText) {
             modalText.textContent = script.status === 'deleted' 
               ? 'Are you sure you want to permanently delete this script? This cannot be undone.'
@@ -2060,7 +2070,22 @@
 
     $('#confirmDeleteBtn').addEventListener('click', () => {
       closeModal('deleteModal');
-      if (state.activeScriptId) deleteScript(state.activeScriptId);
+      if (!state.activeScriptId) return;
+      
+      // If a section is active, delete the section only
+      if (state.activeSectionId) {
+        const script = getActiveScript();
+        if (script && script.sections) {
+          script.sections = script.sections.filter(s => s.id !== state.activeSectionId);
+          state.activeSectionId = null;
+          save();
+          render();
+          showToast('Section deleted', 'success');
+        }
+        return;
+      }
+      
+      deleteScript(state.activeScriptId);
     });
 
     // Print script
